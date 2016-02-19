@@ -8,3 +8,17 @@ use the function `runGithub()`
 if (!require('shiny')) install.packages("shiny")
 shiny::runGitHub("transformPhenotype", "gmelloni")
 ```
+The app relies on some external libraries that you can install beforehand.
+Simply run the following code:
+```s
+neededLibraries <- c(
+"shiny"
+,"shinydashboard"
+,"shinythemes"
+,"DT"
+,"magrittr"
+,"nortest"
+,"forecast"
+)
+sapply(neededLibraries , function(x) if(!x %in% installed.packages()) install.packages(x))
+```
