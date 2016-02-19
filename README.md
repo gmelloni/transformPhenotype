@@ -1,5 +1,4 @@
 # transformPhenotype
-======================
 A normalization tool for continuous traits
 
 To run it locally, you can install the **shiny** package in R, and
