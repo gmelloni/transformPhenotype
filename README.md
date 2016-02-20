@@ -1,5 +1,5 @@
 # transformPhenotype
-A normalization tool for continuous traits
+A shiny app to normalize continuous traits in GWAS
 
 To run it locally, you can install the **shiny** package in R, and
 use the function `runGithub()`
