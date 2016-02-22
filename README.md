@@ -21,3 +21,4 @@ neededLibraries <- c(
 )
 sapply(neededLibraries , function(x) if(!x %in% installed.packages()) install.packages(x))
 ```
+Original code by Angela Matchan, improved by Arthur Gilly, Loz Southam and Rachel Moore.
