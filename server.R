@@ -17,14 +17,15 @@ output$myImage <- renderImage({
     # For high-res displays, this will be greater than 1
     pixelratio <- session$clientData$pixelratio
     # filename <- normalizePath(file.path('data', 'Lognormal_distribution.png'))
-    filename <- normalizePath(file.path('data', 'logo3.png'))
+    filename <- normalizePath(file.path('data', 'logo.png'))
     list(src = filename, alt="Coolest Logo Ever!", width=width , height=height)
   }, deleteFile = FALSE)
+
 # Reactive object with the full dataset
 # This object is activated when you upload some data
 rawData <- reactive({
   # If you click on Load example dataset, it will upload an example
-	if(!is.null(input$myfile)){
+  if(!is.null(input$myfile)){
     inFile <- input$myfile
   } else if(as.logical(input$example)){
     inFile <- list(name="exampleDataset.txt" 
@@ -32,20 +33,23 @@ rawData <- reactive({
   } else {
     return(NULL)
   }
- #  if(!as.logical(input$example)){
- #    inFile <- input$myfile
- #  }else{
- #      inFile <- list(name="exampleDataset.txt" 
- #        , datapath=file.path("data" , "exampleDataset.txt"))
- #  }
-	# if(is.null(inFile))
- #      return(NULL)
-	out <- read.table(inFile$datapath
+  out <- read.table(inFile$datapath
             , header=TRUE
             , sep="\t"
             , fill=TRUE
-            , strip.white=TRUE)
+            , strip.white=TRUE
+            , as.is=TRUE
+            )
   colnames(out) <- tolower(colnames(out))
+  if("sample_id" %in% colnames(out)){
+    out$sample_id <- as.character(out$sample_id)
+    out <- out[ , c("sample_id" , colnames(out)[colnames(out)!="sample_id"])]
+  } else if( length(unique(out[ , 1]))==nrow(out) ){
+    out[ , 1] <- as.character(out[ , 1])
+    colnames(out)[1] <- "sample_id"
+  } else {
+    stop("FORMAT OF THE FILE NOT SUPPORTED. NEED A SAMPLE_ID COLUMN WITH UNIQUE IDENTIFIERS")
+  }
   return(out)
 })
 # reactive column of the chosen trait
@@ -68,10 +72,16 @@ observe({
   updateSelectInput(session , "trait" , "Choose Your Trait:"
       , choices= if(is.null(rawData())){
              				""
-           			}else{
-           				colnames(rawData())[!colnames(rawData()) %in% notTraits]
-           			}
-      , selected=colnames(rawData())[!colnames(rawData()) %in% notTraits][1]
+           			  }else{
+           				 notTraits2 <- c(notTraits , colnames(rawData())[sapply(rawData() , class)=="character"])
+                   colnames(rawData())[!colnames(rawData()) %in% notTraits2]
+           			  }
+      , selected=if(is.null(rawData())){
+                    ""
+                  }else{
+                   notTraits2 <- c(notTraits , colnames(rawData())[sapply(rawData() , class)=="character"])
+                   colnames(rawData())[!colnames(rawData()) %in% notTraits2][1]
+                  }
   )
 })
 # Modify filter selector, based on min and max value of the trait chosen
@@ -134,6 +144,9 @@ if(input$trait!=""){
   # remove tails according to SD specifications
     # note: the SD filter is influenced by stratification by sex
 traitObject <- reactive({
+  if(is.null(rawData())){
+      return(NULL)
+  }
   # Variable from protocol
   altFilter <- protocolFile()$filters
   currTrait <- protocolFile()$trait
@@ -199,6 +212,9 @@ output$protocolFile <- renderTable({
 values <- reactiveValues(df_data=NULL)
 observeEvent(input$storeattempt , {
   temp <- rbind(values$df_data , protocolFile())
+  temp$transformation_method <- mymapvalues(temp$transformation_method 
+                                          , from=names(angela_transformations) 
+                                          , to=unname(angela_transformations))
   values$df_data <- unique(temp)
   })
 output$cumulativeProtocolFile <- DT::renderDataTable({
@@ -258,7 +274,9 @@ output$sexplot <- renderPlot({
   # 6. Run Wilcoxon test to see if sexes differ and print out density plot
   # sexPval<-sexStratification(traitObject,males,females,traitLabel,traitLabelFull)
   project <- as.character(currTrait)
-  sexStratificationPlot(X=traitObject(),m=males,f=females,label=currTrait,labelFull=traitLabelFull,project=project)
+  sexStratificationPlot(X=traitObject(),m=males,f=females
+                      ,label=currTrait,labelFull=traitLabelFull
+                      ,project=project)
 })
 
 # Plot data according to normalization criterion
@@ -296,7 +314,7 @@ output$transformedplot <- renderPlot({
                 } else {
                   1:length(traitObject()$trait)
                 }
-        x <- normalizeTraitData(x=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+        x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
         if(length(x)>5000){
           x <- x[1:5000]
         }
@@ -363,7 +381,7 @@ output$normalizationSideEffect <- renderPrint({
               } else {
                 1:length(traitObject()$trait)
               }
-    x <- normalizeTraitData(x=traitObject()$trait[subs] , tm=transformMethod)
+    x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
     if(length(x)>1){
       outputList <- c(outputList , list(i) , list(x[-1]))
     } else {
@@ -388,7 +406,7 @@ output$normalTable <- DT::renderDataTable({
     normalTable <- lapply(loop , function(sex) {
       lapply(Transformation , function(trans) {
           subs <- if(sex=="Males") males else if(sex=="Females") females else stop("Error in loop")
-          x <- normalizeTraitData(x=traitObject()$trait[subs] , tm=trans)$norm_data
+          x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=trans)$norm_data
           ad <- tryCatch(ad.test(x)$p.value , error=function(e) e)
           sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) e)
           # ks is annoying with warnings in case of ties, so I suppress them
@@ -408,7 +426,7 @@ output$normalTable <- DT::renderDataTable({
   } else if(input$sexStratFlag=="No") {
     Transformation <- names(normalizationFunctionsList)
     normalTable <- lapply(Transformation , function(trans) {
-          x <- normalizeTraitData(x=traitObject()$trait , tm=trans)$norm_data
+          x <- normalizeTraitData(trait=traitObject()$trait , tm=trans)$norm_data
           ad <- tryCatch(ad.test(x)$p.value , error=function(e) e)
           sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) e)
           # ks is annoying with warnings in case of ties, so I suppress them
@@ -462,7 +480,7 @@ output$linearCovariates <- renderPrint({
     males<-which(traitObject()$sex==1)
     loop <- c("Males" , "Females")
     normData <- lapply(list("Males"=males , "Females"=females) , function(subs) {
-        normData <- normalizeTraitData(traitObject()$trait[subs] , transformMethod)$norm_data
+        normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
         signifCovs<-checkCovariates2(covs=covList
                                 ,x=traitObject()[subs , ]
                                 ,normx=normData)
@@ -473,13 +491,17 @@ output$linearCovariates <- renderPrint({
     )
   } else {
     # subs <- 1:nrow(traitObject())
-    normData <- normalizeTraitData(traitObject()$trait , transformMethod)$norm_data
+    normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
     signifCovs<-checkCovariates2(covs=covList
                                 ,x=traitObject()
                                 ,normx=normData)
     return(show(signifCovs))
   }
 })
+
+# This object is the residual table
+# It is updated every time the residualPlot changes
+residual <- reactiveValues(df_res=NULL)
 
 # Normalize data and check for residual of the covariates
 output$residualsPlot <- renderPlot({
@@ -522,7 +544,7 @@ output$residualsPlot <- renderPlot({
     loop <- list("Males"=males , "Females"=females)
     # loop <- c("Males" , "Females")
     normDataListForPlot <- lapply(loop , function(subs) {
-      normData <- normalizeTraitData(traitObject()$trait[subs] , transformMethod)$norm_data
+      normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
       signifCovs<-checkCovariates(covs=covList
                                   ,x=traitObject()[subs,]
                                   ,normx=normData
@@ -541,8 +563,13 @@ output$residualsPlot <- renderPlot({
         outputData <- retData$outputData
         normResiduals <- retData$normResiduals
       }
-      return(list(covString=covString , normResiduals=normResiduals , normData=normData))
+      return(list(covString=covString , normResiduals=normResiduals , normData=normData , outputData=outputData))
       })
+    # Add a side effect for this function, by reporting the actual residual table
+    outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
+    observe({
+      residual$df_res <- outputData
+    })
     return(plotResidualDataBySex(
                     tl=currTrait
                     ,tlf=traitLabelFull
@@ -550,7 +577,7 @@ output$residualsPlot <- renderPlot({
                     ))
   } else {
     subs <- 1:nrow(traitObject())
-    normData <- normalizeTraitData(traitObject()$trait[subs] , transformMethod)$norm_data
+    normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
     cvr <- unlist(strsplit(covariates , ","))
     covList<- list(covariates=cvr
               , age2Flag=if("age2" %in% cvr) TRUE else NA)
@@ -572,6 +599,10 @@ output$residualsPlot <- renderPlot({
       outputData <- retData$outputData
       normResiduals <- retData$normResiduals
     }
+    # Side effect, update residual final table
+    observe({
+      residual$df_res <- outputData
+    })
     return(plotResidualData(tl=currTrait
                     ,tlf=traitLabelFull
                     # ,"No Stratification"
@@ -581,6 +612,34 @@ output$residualsPlot <- renderPlot({
   }
 })
 
+# This observer will wait for the residual table to be present
+# When this event is observed, the download button is enabled
+observeEvent(!is.null(residual$df_res) , {
+    # notify the browser that the residual table is ready to be downloaded
+    session$sendCustomMessage("download_ready_res" , list(mex=""))
+})
+
+# Download residuals table
+output$downloadResidual <- downloadHandler(
+    filename=function() {
+      timeTag <- Sys.time() %>% 
+            sub(" GMT$" , "" , .) %>% 
+            gsub(":" , "_" , .) %>%
+            gsub("-" , "" , .) %>%
+            sub(" " , "." , .)
+      paste(protocolFile()$trait , "residuals" , timeTag , "stand_residuals.txt" , sep=".")
+    }
+    , content=function(file) {
+        write.table(residual$df_res
+                , file=file
+                , sep = "\t"
+                , col.names = TRUE
+                , row.names = FALSE
+                , quote=FALSE)
+})
+
+# This observer will wait for the store button to be pressed at least once
+# When this event is observed, the download button is enabled
 observeEvent(input$storeattempt , {
     # notify the browser that the the protocol is ready to be downloaded
     session$sendCustomMessage("download_ready" , list(mex=""))

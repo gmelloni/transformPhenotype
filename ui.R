@@ -16,6 +16,20 @@ tagfordisable <- singleton(tags$head(HTML(
   </script>
 '
 )))
+tagfordisable2 <- singleton(tags$head(HTML(
+'
+  <script type="text/javascript">
+    $(document).ready(function() {
+      // disable download at startup. downloadResidual is the id of the downloadButton
+      $("#downloadResidual").attr("disabled", "true").attr("onclick", "return false;");
+      Shiny.addCustomMessageHandler("download_ready_res", function(message) {
+        $("#downloadResidual").removeAttr("disabled").removeAttr("onclick").html(
+          "<i class=\\"fa fa-download\\"></i> Download of residual table file is ready" + message.mex);
+      });
+    })
+  </script>
+'
+)))
 
 shinyUI(
   dashboardPage(skin="purple"
@@ -32,27 +46,27 @@ shinyUI(
     )
     ,body=dashboardBody(
        tags$head(tags$style(HTML("
-      		@import url('//fonts.googleapis.com/css?family=Lobster|Cabin:400,700');
-    		")))
+          @import url('//fonts.googleapis.com/css?family=Lobster|Cabin:400,700');
+        ")))
       ,tags$head(tags$style(HTML('
-      		.main-header .logo {
-        		font-family: "Lobster", cursive;
-        		font-weight: bold;
-      		}
-    	')))
+          .main-header .logo {
+            font-family: "Lobster", cursive;
+            font-weight: bold;
+          }
+      ')))
       ,tabItems(
         tabItem("analysispan" , 
           fluidPage(
             tagfordisable
          #    ,tags$head(
-        	# 	tags$style(type="text/css", "label.radio { display: inline-block; }", ".radio input[type=\"radio\"] { float: none; }"),
-        	# 	tags$style(type="text/css", "select { max-width: 200px; }"),
-        	# 	tags$style(type="text/css", "textarea { max-width: 4000px; }"),
-        	# 	tags$style(type="text/css", ".jslider { max-width: 200px; }"),
-        	# 	tags$style(type='text/css', ".well { padding: 12px; margin-bottom: 5px; max-width: 280px; }"),
-        	# 	tags$style(type='text/css', ".span4 { max-width: 10px; }"),
-        	# 	tags$style(type='text/css', ".span8 { max-width: 4000px; min-width: 4000px;}")
-      			# )
+          #   tags$style(type="text/css", "label.radio { display: inline-block; }", ".radio input[type=\"radio\"] { float: none; }"),
+          #   tags$style(type="text/css", "select { max-width: 200px; }"),
+          #   tags$style(type="text/css", "textarea { max-width: 4000px; }"),
+          #   tags$style(type="text/css", ".jslider { max-width: 200px; }"),
+          #   tags$style(type='text/css', ".well { padding: 12px; margin-bottom: 5px; max-width: 280px; }"),
+          #   tags$style(type='text/css', ".span4 { max-width: 10px; }"),
+          #   tags$style(type='text/css', ".span8 { max-width: 4000px; min-width: 4000px;}")
+            # )
             # , conditionalDisabledPanel(element="goDDButton" , tagmessage="go_with_the_analysis") 
             ,sidebarLayout(
               sidebarPanel(
@@ -103,14 +117,12 @@ shinyUI(
                 ,max = 1
                 ,value = c(0,1))
               ,tags$hr()
-              ,downloadButton("downloadFinalProtocol")
-              ,helpText("Download will be available after first click to Store this transformation.")             
             )
             ,mainPanel(
                 tabsetPanel(
                   type = "tabs"
                   ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")))
-                  , tabPanel("Protocol" , fluidPage(tableOutput("protocolFile")))
+                  # , tabPanel("Protocol" , fluidPage(tableOutput("protocolFile")))
                   , tabPanel("Gender Difference" , fluidPage(plotOutput("sexplot",height = "800px")))
                   , tabPanel("Data Plot" , fluidPage(
                           plotOutput("transformedplot",height = "800px")
@@ -122,9 +134,20 @@ shinyUI(
                           ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)") ))
                   # , tabPanel("FilterData" , fluidPage(tableOutput("traitObject2")))
                   , tabPanel("Covariate Analysis" , fluidPage(
-                          verbatimTextOutput("linearCovariates")
+                          tagfordisable2
+                          ,downloadButton("downloadResidual" , label="Download Final Residuals")
+                          ,verbatimTextOutput("linearCovariates")
                           ,plotOutput("residualsPlot", height="800px") ))
-                  , tabPanel("All my attempts" , fluidPage(DT::dataTableOutput("cumulativeProtocolFile")))
+                  , tabPanel("Protocol" , fluidPage(
+                        p(h3(span("Current Trait" , style = "color:blue")))
+                        ,tableOutput("protocolFile")
+                        ,tagfordisable
+                        ,p(h3(span("Cumulative Protocol File" , style = "color:blue")))
+                        ,downloadButton("downloadFinalProtocol" , label="Download Protocol File")
+                        ,helpText("Download will be available after first click to Store this transformation.")             
+                        ,DT::dataTableOutput("cumulativeProtocolFile")
+                        ))
+                  # , tabPanel("Residual Table" , fluidPage(tableOutput("residualTable")))
                 )
             )
           ))
@@ -147,7 +170,7 @@ shinyUI(
             ,mainPanel(
               p(h4("The TransformPhenotype App was created by Giorgio Melloni at the Wellcome Trust Sange Institute")),
               p(h4("The original code was written by Angela Matchan and improved by Arthur Gilly, Rachel Moore and Loz Southam")),
-              p(h3("For any question or suggestion regarding the app, write to" 
+              p(h4("For any question or suggestion regarding the app, write to" 
                   , span("giorgio.melloni [a] iit.it" , style = "color:blue"))),
               br(),
               p(h3(strong("Thank you for using our app :)")))
