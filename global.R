@@ -1,6 +1,5 @@
-# Switch on and off button (currently not used)
+# Switch on and off button
 source(file.path("data" , "custom_functions" , "conditionalDisabledPanel.R"))
-
 # normalizationFunctions.R is composed by:
 	# a list of functions that can be expanded or modified 
 	# the normalizeTraitData function
@@ -10,14 +9,12 @@ source(file.path("data" , "custom_functions" , "conditionalDisabledPanel.R"))
 source(file.path("data" , "custom_functions" , "normalizationFunctions.R"))
 
 # list of keywords to not be used as traits
-notTraits <- c("Phentoype" 
-			, "Phenotype" 
-			, "Genotype" 
-			, "Age"
+notTraits <- c("phentoype" 
+			, "phenotype" 
+			, "genotype" 
+			, "age"
 			, "gender"
-			, "Gender"
-			, "Sample"
-			, "Sex" 
+			, "sample" 
 			, "age" 
 			, "sex" 
 			, "sample_id"
