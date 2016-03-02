@@ -8,6 +8,8 @@ options(DT.options = list(pageLength = 20))
 
 # Internal functions of the app
 source(file.path("data" , "custom_functions" , "transformFunctions.R"))
+# Serie of cool utility functions used from time to time
+source(file.path("data" , "custom_functions" , "utilitiesFunctions.R"))
 
 shinyServer(function(input, output,session) {
 #Put The Logo
@@ -41,17 +43,64 @@ rawData <- reactive({
             , as.is=TRUE
             )
   colnames(out) <- tolower(colnames(out))
+  rawRows <- nrow(out)
+  out <- unique(out)
+  if(nrow(out)!=rawRows)
+    warning("FOUND DUPLICATED ROWS. REMOVED")
+  #### Check for Sanger Phenotype Database format
+    # There is currently a typo in the database (phentoype instead of phenotype)
+    # We accept bothe forms
+  if( all(c("genotype" , "phenotype") %in% colnames(out)) | all(c("genotype" , "phentoype") %in% colnames(out)) ){
+    out$sample_id <- out$genotype
+    out$phenotype <- NULL
+    out$genotype <- NULL
+  }
+  # If sample_id is among the colnames it is going to be used as sample identifier
+  # If sample_id doesn't exist, shiny tries with the first column, otherwise dies
   if("sample_id" %in% colnames(out)){
     out$sample_id <- as.character(out$sample_id)
-    out <- out[ , c("sample_id" , colnames(out)[colnames(out)!="sample_id"])]
+    if( length(unique(out$sample_id))==nrow(out) )
+      out <- out[ , c("sample_id" , colnames(out)[colnames(out)!="sample_id"])]
+    else
+      stop("sample_id COLUMN HAS DUPLICATED VALUES")
   } else if( length(unique(out[ , 1]))==nrow(out) ){
     out[ , 1] <- as.character(out[ , 1])
     colnames(out)[1] <- "sample_id"
   } else {
     stop("FORMAT OF THE FILE NOT SUPPORTED. NEED A SAMPLE_ID COLUMN WITH UNIQUE IDENTIFIERS")
   }
+  ##### Check sex
+    # At least sex or gender must be present
+  if( all(c("sex" , "gender") %notin% colnames(out)) ){
+    stop("SEX OR GENDER REQUIRED")
+  }
+  if( all(c("sex" , "gender") %in% colnames(out)) ){
+    if( all(out$sex %eq% out$gender) ){
+      out$gender <- NULL
+      warning("FOUND BOTH SEX AND GENDER COLUMNS. KEPT SEX")
+    } else {
+      stop("FOUND BOTH SEX AND GENDER COLUMNS AND THEY ARE DIFFERENT. GET RID OF ONE OF THEM")
+    }
+  } else if("gender" %in% colnames(out)) {
+    warning("GENDER COLUMN CHANGED TO SEX")
+    out$sex <- out$gender
+    out$gender <- NULL
+  }
+    # We can accept sex coded as 0/1 or M/F or m/f
+    # Our standard will be 1/2 (plink style)
+  out$sex[out$sex==""] <- NA
+  if( all(na.omit(out$sex) %in% c(0,1)) ){
+    out$sex <- out$sex + 1
+  } else if( all( na.omit(tolower(out$sex)) %in% c("m","f")) ){
+    out$sex <- .mymapvalues(tolower(out$sex) , from=c("m" , "f") , to=c(1,2)) %>%
+                as.integer
+  } else if( any( na.omit(out$sex) %notin% c(1,2) ) ){
+    stop("UNRECOGNIZED OR MIXED SEX CODIFICATION. REVERT TO 1==MALE , 2==FEMALE")
+  }
+  out$sex <- suppressWarnings( as.numeric(out$sex) )
   return(out)
 })
+
 # reactive column of the chosen trait
 mytrait <- reactive({
   rawData()[[input$trait]]
@@ -212,7 +261,7 @@ output$protocolFile <- renderTable({
 values <- reactiveValues(df_data=NULL)
 observeEvent(input$storeattempt , {
   temp <- rbind(values$df_data , protocolFile())
-  temp$transformation_method <- mymapvalues(temp$transformation_method 
+  temp$transformation_method <- .mymapvalues(temp$transformation_method 
                                           , from=names(angela_transformations) 
                                           , to=unname(angela_transformations))
   values$df_data <- unique(temp)
