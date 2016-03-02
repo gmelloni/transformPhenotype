@@ -23,3 +23,4 @@ if (!require('shiny')) install.packages("shiny")
 shiny::runGitHub("transformPhenotype", "gmelloni")
 ```
 Original code by Angela Matchan, improved by Arthur Gilly, Loz Southam and Rachel Moore.
+Master branch is compatible with original script. Future versions will probably walk astray.
