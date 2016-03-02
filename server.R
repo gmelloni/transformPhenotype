@@ -23,6 +23,8 @@ output$myImage <- renderImage({
     list(src = filename, alt="Coolest Logo Ever!", width=width , height=height)
   }, deleteFile = FALSE)
 
+# Create a reactive value for error
+dferror <- reactiveValues(myerror=NULL)
 # Reactive object with the full dataset
 # This object is activated when you upload some data
 rawData <- reactive({
@@ -59,27 +61,32 @@ rawData <- reactive({
   # If sample_id doesn't exist, shiny tries with the first column, otherwise dies
   if("sample_id" %in% colnames(out)){
     out$sample_id <- as.character(out$sample_id)
-    if( length(unique(out$sample_id))==nrow(out) )
+    if( length(unique(out$sample_id))==nrow(out) ){
       out <- out[ , c("sample_id" , colnames(out)[colnames(out)!="sample_id"])]
-    else
-      stop("sample_id COLUMN HAS DUPLICATED VALUES")
+    } else {
+      dferror$myerror <- "sample_id COLUMN HAS DUPLICATED VALUES"
+      return(NULL)
+    }
   } else if( length(unique(out[ , 1]))==nrow(out) ){
     out[ , 1] <- as.character(out[ , 1])
     colnames(out)[1] <- "sample_id"
   } else {
-    stop("FORMAT OF THE FILE NOT SUPPORTED. NEED A SAMPLE_ID COLUMN WITH UNIQUE IDENTIFIERS")
+    dferror$myerror <- "FORMAT OF THE FILE NOT SUPPORTED. NEED A SAMPLE_ID COLUMN WITH UNIQUE IDENTIFIERS"
+    return(NULL)
   }
   ##### Check sex
     # At least sex or gender must be present
   if( all(c("sex" , "gender") %notin% colnames(out)) ){
-    stop("SEX OR GENDER REQUIRED")
+    dferror$myerror <- "SEX OR GENDER REQUIRED"
+    return(NULL)
   }
   if( all(c("sex" , "gender") %in% colnames(out)) ){
     if( all(out$sex %eq% out$gender) ){
       out$gender <- NULL
       warning("FOUND BOTH SEX AND GENDER COLUMNS. KEPT SEX")
     } else {
-      stop("FOUND BOTH SEX AND GENDER COLUMNS AND THEY ARE DIFFERENT. GET RID OF ONE OF THEM")
+      dferror$myerror <- "FOUND BOTH SEX AND GENDER COLUMNS AND THEY ARE DIFFERENT. GET RID OF ONE OF THEM"
+      return(NULL)
     }
   } else if("gender" %in% colnames(out)) {
     warning("GENDER COLUMN CHANGED TO SEX")
@@ -95,11 +102,15 @@ rawData <- reactive({
     out$sex <- .mymapvalues(tolower(out$sex) , from=c("m" , "f") , to=c(1,2)) %>%
                 as.integer
   } else if( any( na.omit(out$sex) %notin% c(1,2) ) ){
-    stop("UNRECOGNIZED OR MIXED SEX CODIFICATION. REVERT TO 1==MALE , 2==FEMALE")
+    dferror$myerror <- "UNRECOGNIZED OR MIXED SEX CODIFICATION. REVERT TO 1==MALE , 2==FEMALE"
+    return(NULL)
   }
   out$sex <- suppressWarnings( as.numeric(out$sex) )
+  dferror$myerror <- "DATA LOADED CORRECTLY"
   return(out)
 })
+# What was wrong with my data?
+output$dferror <- renderPrint(dferror$myerror)
 
 # reactive column of the chosen trait
 mytrait <- reactive({
