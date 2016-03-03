@@ -101,55 +101,64 @@ shinyUI(
                      ,"Less than"='lt'
                      ,"Both"='both')
                     ,'both')
+              ,sliderInput("filters", "Additional filter on raw values:"
+                ,min = 0
+                ,max = 1
+                ,value = c(0,1))
               ,selectInput("covariates_tested", 
                 "Choose one or more covariate:", 
                 ,choices=NA
                 ,multiple=TRUE
                 ,selected=NA)
               ,helpText("If you select NA among covariates, it will overwrite any other choice")
+              ,tags$hr()
               ,radioButtons('sexStratFlag', 'Stratify by sex?'
                    ,c("Yes"="Yes"
                      ,"No"="No"
                      )
                     ,"No")
-              ,sliderInput("filters", "Additional filter on raw values:"
-                ,min = 0
-                ,max = 1
-                ,value = c(0,1))
-              ,tags$hr()
+              ,selectInput("stratifier"
+                ,"Choose one stratification column:"
+                ,choices=NA
+                ,multiple=FALSE
+                ,selected=NA)
             )
             ,mainPanel(
-                tabsetPanel(
-                  type = "tabs"
-                  ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")) 
-                                            , verbatimTextOutput("dferror"))
-                  # , tabPanel("Protocol" , fluidPage(tableOutput("protocolFile")))
-                  , tabPanel("Gender Difference" , fluidPage(plotOutput("sexplot",height = "800px")))
-                  , tabPanel("Data Plot" , fluidPage(
-                          plotOutput("transformedplot",height = "800px")
-                          ,tags$hr()
-                          ,verbatimTextOutput("normalizationSideEffect")
-                          ))
-                  , tabPanel("Normality Summary" , fluidPage(
-                          DT::dataTableOutput("normalTable")
-                          ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)") ))
-                  # , tabPanel("FilterData" , fluidPage(tableOutput("traitObject2")))
-                  , tabPanel("Covariate Analysis" , fluidPage(
-                          tagfordisable2
-                          ,downloadButton("downloadResidual" , label="Download Final Residuals")
-                          ,verbatimTextOutput("linearCovariates")
-                          ,plotOutput("residualsPlot", height="800px") ))
-                  , tabPanel("Protocol" , fluidPage(
-                        p(h3(span("Current Trait" , style = "color:blue")))
-                        ,tableOutput("protocolFile")
-                        ,tagfordisable
-                        ,p(h3(span("Cumulative Protocol File" , style = "color:blue")))
-                        ,downloadButton("downloadFinalProtocol" , label="Download Protocol File")
-                        ,helpText("Download will be available after first click to Store this transformation.")             
-                        ,DT::dataTableOutput("cumulativeProtocolFile")
+              tabsetPanel(
+                type = "tabs"
+                ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")) 
+                                          , verbatimTextOutput("dferror"))
+                # , tabPanel("Protocol" , fluidPage(tableOutput("protocolFile")))
+                , tabPanel("Gender Difference" , fluidPage(
+                    # plotOutput("sexplot",height = "800px")
+                    uiOutput("sexplot")
+                    )
+                  )
+                , tabPanel("Data Plot" , fluidPage(
+                        plotOutput("transformedplot",height = "800px")
+                        ,tags$hr()
+                        ,verbatimTextOutput("normalizationSideEffect")
                         ))
-                  # , tabPanel("Residual Table" , fluidPage(tableOutput("residualTable")))
-                )
+                , tabPanel("Normality Summary" , fluidPage(
+                        DT::dataTableOutput("normalTable")
+                        ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)") ))
+                # , tabPanel("FilterData" , fluidPage(tableOutput("traitObject2")))
+                , tabPanel("Covariate Analysis" , fluidPage(
+                        tagfordisable2
+                        ,downloadButton("downloadResidual" , label="Download Final Residuals")
+                        ,verbatimTextOutput("linearCovariates")
+                        ,plotOutput("residualsPlot", height="800px") ))
+                , tabPanel("Protocol" , fluidPage(
+                      p(h3(span("Current Trait" , style = "color:blue")))
+                      ,tableOutput("protocolFile")
+                      ,tagfordisable
+                      ,p(h3(span("Cumulative Protocol File" , style = "color:blue")))
+                      ,downloadButton("downloadFinalProtocol" , label="Download Protocol File")
+                      ,helpText("Download will be available after first click to Store this transformation.")             
+                      ,DT::dataTableOutput("cumulativeProtocolFile")
+                      ))
+                # , tabPanel("Residual Table" , fluidPage(tableOutput("residualTable")))
+              )
             )
           ))
         )

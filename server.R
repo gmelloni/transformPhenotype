@@ -110,12 +110,14 @@ rawData <- reactive({
   return(out)
 })
 # What was wrong with my data?
+# Error message about format is stored together with rawData() reactive object
 output$dferror <- renderPrint(dferror$myerror)
 
-# reactive column of the chosen trait
+# Reactive column of the chosen trait
 mytrait <- reactive({
   rawData()[[input$trait]]
 })
+
 # Show the uploaded table
 output$contents <- DT::renderDataTable({
   rawData()
@@ -127,19 +129,26 @@ output$contents <- DT::renderDataTable({
               ,pageLength = 10)
   ,filter = 'bottom'
 )
+
+#---------------------------------#
+#       SELECTOR MODIFIERS        #
+#---------------------------------#
+
 #Change Trait selector according to the colnames of user table
 observe({
   updateSelectInput(session , "trait" , "Choose Your Trait:"
       , choices= if(is.null(rawData())){
              				""
            			  }else{
-           				 notTraits2 <- c(notTraits , colnames(rawData())[sapply(rawData() , class)=="character"])
+           				 notTraits2 <- c(notTraits 
+                                , colnames(rawData())[sapply(rawData() , class)=="character"])
                    colnames(rawData())[!colnames(rawData()) %in% notTraits2]
            			  }
       , selected=if(is.null(rawData())){
                     ""
                   }else{
-                   notTraits2 <- c(notTraits , colnames(rawData())[sapply(rawData() , class)=="character"])
+                   notTraits2 <- c(notTraits 
+                                , colnames(rawData())[sapply(rawData() , class)=="character"])
                    colnames(rawData())[!colnames(rawData()) %in% notTraits2][1]
                   }
   )
@@ -160,7 +169,8 @@ observe({
 # If age is among the variable, age2 is added too
 observe({
   if(!is.null(rawData())){
-    newchoices <- colnames(rawData()) %>% .[.!="sample_id"]
+    # covariates must be numerical or integer
+    newchoices <- colnames(rawData())[sapply(rawData() , class)!="character"]
     newchoices <- c(NA , newchoices)
     if("age" %in% newchoices)
       newchoices <- c(newchoices , "age2") %>% sort
@@ -168,6 +178,19 @@ observe({
     updateSelectInput(session , "covariates_tested" , "Choose one or more covariate:"
         , choices= newchoices
         , selected=if("sex" %in% newchoices) "sex" else NA
+    )
+  }
+})
+# Adjust the stratifier
+# Stratifiers are all the character columns, except for sample_id column
+observe({
+  if(!is.null(rawData())){
+    # covariates must be character
+    stratifiers <- c(NA , colnames(rawData())[sapply(rawData() , class)=="character"])
+    stratifiers <- stratifiers[stratifiers!="sample_id"]
+    updateSelectInput(session , "stratifier" , "Choose one stratification variable:"
+        , choices=stratifiers
+        , selected=NA
     )
   }
 })
@@ -198,6 +221,11 @@ if(input$trait!=""){
   return(NULL)
 }
 })
+
+#----------------------------------------------#
+#   CREATING TRAITOBJECT FILTERING RAW DATA    #
+#----------------------------------------------#
+
 # Reduce dataset according to protocol specification
   # remove missing sex specification
   # remove absolute outliers
@@ -222,44 +250,93 @@ traitObject <- reactive({
   if(length(missingSex>0)){
     dataset <- dataset[-missingSex,]
   }
-  traitObject <- createDF(currTrait,covList,dataset)
-  # Apply hard filter for oulier
-  if(!is.na(altFilter)){
-    outliersFilter <- applyFilters(altFilter,traitObject)
-    excl <- which(traitObject$ID %in% outliersFilter)
-    if(length(excl)>0)traitObject <- traitObject[-excl,]
-  }
-  females<-which(traitObject$sex==2)
-  males<-which(traitObject$sex==1)
-  if(input$sexStratFlag=="Yes"){
-    if(!is.na(numSDs)){
-      maleSdOutliers <-findSdOutliers(numSDs,sdDir,traitObject[males,])
-      femaleSdOutliers <-findSdOutliers(numSDs,sdDir,traitObject[females,])
-      sdOutliers <- c(maleSdOutliers,femaleSdOutliers)
-      excl<-which(traitObject$ID %in% sdOutliers)
-      if(length(excl)>0){
-        traitObjforRawPlot <- traitObject[-excl,]
+  if(is.na(input$stratifier)| input$stratifier %in% c("" , "NA")){
+    traitObject <- createDF(currTrait,covList,dataset)
+    # Apply hard filter for oulier
+    if(!is.na(altFilter)){
+      outliersFilter <- applyFilters(altFilter,traitObject)
+      excl <- which(traitObject$ID %in% outliersFilter)
+      if(length(excl)>0)traitObject <- traitObject[-excl,]
+    }
+    females<-which(traitObject$sex==2)
+    males<-which(traitObject$sex==1)
+    if(input$sexStratFlag=="Yes"){
+      if(!is.na(numSDs)){
+        maleSdOutliers <-findSdOutliers(numSDs,sdDir,traitObject[males,])
+        femaleSdOutliers <-findSdOutliers(numSDs,sdDir,traitObject[females,])
+        sdOutliers <- c(maleSdOutliers,femaleSdOutliers)
+        excl<-which(traitObject$ID %in% sdOutliers)
+        if(length(excl)>0){
+          traitObjforRawPlot <- traitObject[-excl,]
+        } else {
+          traitObjforRawPlot <- traitObject  
+        }
       } else {
-        traitObjforRawPlot <- traitObject  
+        traitObjforRawPlot <- traitObject
       }
     } else {
-      traitObjforRawPlot <- traitObject
+      if(!is.na(numSDs)){
+        sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
+        excl<-which(traitObject$ID %in% sdOutliers)
+        if(length(excl)>0){
+          traitObjforRawPlot <- traitObject[-excl,]
+        } else {
+          traitObjforRawPlot <- traitObject  
+        }
+      } else {
+        traitObjforRawPlot <- traitObject
+      }
     }
+    return(traitObjforRawPlot)
   } else {
-    if(!is.na(numSDs)){
-      sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
-      excl<-which(traitObject$ID %in% sdOutliers)
-      if(length(excl)>0){
-        traitObjforRawPlot <- traitObject[-excl,]
-      } else {
-        traitObjforRawPlot <- traitObject  
+    datasetsplit <- split(dataset , dataset[ , input$stratifier])
+    traitObjectSplit <- lapply(datasetsplit , function(dataset){
+      traitObject <- createDF(currTrait,covList,dataset)
+      # Apply hard filter for oulier
+      if(!is.na(altFilter)){
+        outliersFilter <- applyFilters(altFilter,traitObject)
+        excl <- which(traitObject$ID %in% outliersFilter)
+        if(length(excl)>0)traitObject <- traitObject[-excl,]
       }
-    } else {
-      traitObjforRawPlot <- traitObject
-    }
+      females<-which(traitObject$sex==2)
+      males<-which(traitObject$sex==1)
+      if(input$sexStratFlag=="Yes"){
+        if(!is.na(numSDs)){
+          maleSdOutliers <-findSdOutliers(numSDs,sdDir,traitObject[males,])
+          femaleSdOutliers <-findSdOutliers(numSDs,sdDir,traitObject[females,])
+          sdOutliers <- c(maleSdOutliers,femaleSdOutliers)
+          excl<-which(traitObject$ID %in% sdOutliers)
+          if(length(excl)>0){
+            traitObjforRawPlot <- traitObject[-excl,]
+          } else {
+            traitObjforRawPlot <- traitObject  
+          }
+        } else {
+          traitObjforRawPlot <- traitObject
+        }
+      } else {
+        if(!is.na(numSDs)){
+          sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
+          excl<-which(traitObject$ID %in% sdOutliers)
+          if(length(excl)>0){
+            traitObjforRawPlot <- traitObject[-excl,]
+          } else {
+            traitObjforRawPlot <- traitObject  
+          }
+        } else {
+          traitObjforRawPlot <- traitObject
+        }
+      }
+      return(traitObjforRawPlot)
+    })
+    names(traitObjectSplit) <- names(datasetsplit)
+    return(traitObjectSplit)
   }
-  return(traitObjforRawPlot)
 })
+
+#-------------------------------#
+#   PROTOCOL FILE ADJUSTMENT    #
+#-------------------------------#
 
 # Display protocol file
 output$protocolFile <- renderTable({
@@ -290,53 +367,66 @@ observeEvent(input$deleteattempt , {
   }
 })
 
+#--------------------------#
+#   SEX DIFFERENCE PLOT    #
+#--------------------------#
 
+
+emptyPlotter <-function(message){
+  renderPlot({
+      par(mar = c(0,0,0,0))
+      plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+      text(x = 0.5, y = 0.5, message
+        ,cex = 3, col = "black")
+  })
+}
 
 # Plot density curves of trait between males and females
-output$sexplot <- renderPlot({
+# output$sexplot <- renderPlot({
+output$sexplot <- renderUI({
   if(is.null(rawData())){
-    return({
-      par(mar = c(0,0,0,0))
-      plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      text(x = 0.5, y = 0.5, "No data yet"
-        ,cex = 3, col = "black")
-    })
+    output$sexplotempty <- emptyPlotter("No Data Yet")
+    return(
+    plotOutput("sexplotempty" , height="800px")
+    )
   }
-  # Extract covariate field: if it is NA, abort the plot
-  covariates <- as.character(protocolFile()$covariates_tested)
-  if(is.na(covariates[1])){
-    return({
-      par(mar = c(0,0,0,0))
-      plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      text(x = 0.5, y = 0.5, "Select sex in your covariates\nif you want to see this plot"
-        ,cex = 3, col = "black")
-    })
-  }
-  # Now that we now that is not NA, let's split it and check if sex is among covariates
-  covariatesSplit <- unlist(strsplit(covariates , ","))
-  if(!"sex" %in% covariatesSplit){
-    return({
-      par(mar = c(0,0,0,0))
-      plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      text(x = 0.5, y = 0.5, "Select sex in your covariates\nif you want to see this plot"
-        ,cex = 3, col = "black")
-    }) 
-  }
+  # Global parameters, indipendent from traitObject
   currTrait <- protocolFile()$trait
   traitUnit <- protocolFile()$units
-  # transformMethod <- protocolFile()$transformation_method
-  # if(length(bmiCheck)>0) currTrait <- paste(currTrait,"BMIadj",sep="")
   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
   # Start checking between sexes    
-  females<-which(traitObject()$sex==2)
-  males<-which(traitObject()$sex==1)
-
-  # 6. Run Wilcoxon test to see if sexes differ and print out density plot
-  # sexPval<-sexStratification(traitObject,males,females,traitLabel,traitLabelFull)
   project <- as.character(currTrait)
-  sexStratificationPlot(X=traitObject(),m=males,f=females
-                      ,label=currTrait,labelFull=traitLabelFull
-                      ,project=project)
+  # Extract covariate field: if it is NA, abort the plot
+  covariates <- as.character(protocolFile()$covariates_tested)
+  covariatesSplit <- unlist(strsplit(covariates , ","))
+  if(!"sex" %in% covariatesSplit){
+    output$sexplotempty <- emptyPlotter("Select sex in your covariates\nif you want to see this plot")
+    return(
+      plotOutput("sexplotempty" , height="800px")
+    )
+  }
+  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+    # Check if sex is among covariates
+    # Run Wilcoxon test to see if sexes differ and print out density plot
+    females<-which(traitObject()$sex==2)
+    males<-which(traitObject()$sex==1)
+    output$monosexplot <- renderPlot(sexStratificationPlot(X=traitObject(),m=males,f=females
+                                    ,label=currTrait,labelFull=traitLabelFull
+                                    ,project=project))
+    return(plotOutput("monosexplot" , height="800px"))
+  } else {
+    tabs <- lapply(names(traitObject()) , function(strat){
+              females<-which(traitObject()[[strat]]$sex==2)
+              males<-which(traitObject()[[strat]]$sex==1)
+              output[[paste0("sexstrat_",strat)]] <- renderPlot({
+                    sexStratificationPlot(X=traitObject()[[strat]],m=males,f=females
+                                      ,label=currTrait,labelFull=traitLabelFull
+                                      ,project=project)
+                  })
+              return(tabPanel(strat , plotOutput(paste0("sexstrat_",strat) , height="800px")))
+            })
+    return(do.call(tabsetPanel , tabs))
+  }
 })
 
 # Plot data according to normalization criterion
