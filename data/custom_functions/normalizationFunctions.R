@@ -190,3 +190,94 @@ names(angela_transformations) <- equivalence_table
 # 		,square=x^2
 # 	)})
 # }
+
+
+
+
+#------------------#
+# ORIGINAL VERSION #
+#------------------#
+
+# boxcox <- function(y, lambda){
+# 	if(lambda==0){return(log(y))}
+# 	else{return((y^lambda-1)/lambda)}
+# }
+
+# normaldistance <- function(y){
+# 	q=qqnorm((y-mean(y))/sd(y), plot.it=F);
+# 	return(mean(abs(q$x-q$y)/sqrt(2)));
+# }
+
+# bogusoptim <- function(lambda, y){
+# 	return(normaldistance(boxcox(y, lambda)));
+# }
+
+# boxit <- function(y, tolerance=1){
+# 	return(optimise(bogusoptim, c(-5,5), tol=tolerance, y));
+# }
+
+
+# # normalizeTraitData <- function(x,tm,sex){
+# normalizeTraitData <- function(x,tm){
+# 	if(tm == "box_cox"){
+# 		power_vals <- c(-5, -4, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 4, 5)
+# 		power_opt <- c()
+# 		for (i in 1:length(power_vals)){
+# 			power_opt <- c(power_opt, as.numeric(bogusoptim(power_vals[i], x)))
+# 		}
+# 		goodness <- min(power_opt)
+# 		power <- power_vals[which.min(power_opt)]
+# 		norm_data <- boxcox(x, power)
+# 	}else if(tm == "inverse_normal"){
+# 		norm_data <- qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))
+# 	}else if(tm == "log"){
+# 		norm_data <- log(x)
+
+# 	}else if(tm == "square"){
+# 		norm_data <- x^2
+# 	}else if(tm == "untransformed"){
+# 		norm_data<-x
+# 	}else{
+# 		norm_data<-x
+# 	}
+# 	return(norm_data)
+# }
+
+# Another version of the function using switch.
+# It works, but is a little more complicated to expand
+
+# normalizeTraitData <- function(x , tm) {
+# 	return({
+# 		switch(EXPR=tm
+# 		,untransformed = x
+# 		,log = log(x)
+# 		,log10 = log10(x)
+# 		,box_cox = {
+# 			.normaldistance <- function(y){
+# 				q=qqnorm((y-mean(y))/sd(y), plot.it=F);
+# 				return(mean(abs(q$x-q$y)/sqrt(2)));				
+# 			}
+# 			.bogusoptim <- function(lambda, y){
+# 				return(.normaldistance(.boxcox(y, lambda)));				
+# 			}
+# 			.boxcox <- function(y, lambda){
+# 				if(lambda==0){return(log(y))}
+# 				else{return((y^lambda-1)/lambda)}
+# 			}
+# 			# boxit <- function(y, tolerance=1){
+# 			# 	return(optimise(.bogusoptim, c(-5,5), tol=tolerance, y));				
+# 			# }
+# 			power_vals <- c(-5, -4, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 4, 5)
+# 			power_opt <- c()
+# 			for (i in 1:length(power_vals)){
+# 				power_opt <- c(power_opt, as.numeric(.bogusoptim(power_vals[i], x)))
+# 			}
+# 			goodness <- min(power_opt)
+# 			power <- power_vals[which.min(power_opt)]
+# 			norm_data <- .boxcox(x, power)
+# 			return(norm_data)
+# 			}
+# 		,inverse_normal = qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))
+# 		,square=x^2
+# 	)})
+# }
