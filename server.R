@@ -111,7 +111,13 @@ rawData <- reactive({
     return(NULL)
   }
   out$sex <- suppressWarnings( as.numeric(out$sex) )
-  dferror$myerror <- "DATA LOADED CORRECTLY"
+  dferror$myerror <- paste("DATA LOADED CORRECTLY:"
+                          ,"Numeric Traits:" %++% length(which(sapply(out , class)=="numeric"))
+                          # ,"Sex detected:" %++% c("Yes" , "No")[as.numeric(any(colnames(out)=="sex"))+1]
+                          # ,"Age detected:" %++% c("Yes" , "No")[as.numeric(any(colnames(out)=="age"))+1]
+                          # ,"Stratification Variables:" %++% length(which(sapply(out , class)=="character")) - 1
+                          , sep="\n")
+  print(dferror$myerror)
   return(out)
 })
 # What was wrong with my data?
