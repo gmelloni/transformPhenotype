@@ -140,8 +140,11 @@ shinyUI(
                         ,verbatimTextOutput("normalizationSideEffect")
                         ))
                 , tabPanel("Normality Summary" , fluidPage(
-                        DT::dataTableOutput("normalTable")
-                        ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)") ))
+                    uiOutput("normalTable")
+                    # DT::dataTableOutput("normalTable")
+                    # ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)") 
+                    )
+                  )
                 # , tabPanel("FilterData" , fluidPage(tableOutput("traitObject2")))
                 , tabPanel("Covariate Analysis" , fluidPage(
                         tagfordisable2

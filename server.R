@@ -23,8 +23,13 @@ output$myImage <- renderImage({
     list(src = filename, alt="Coolest Logo Ever!", width=width , height=height)
   }, deleteFile = FALSE)
 
+#---------------------#
+#     LOAD DATASET    #
+#---------------------#
+
 # Create a reactive value for error
 dferror <- reactiveValues(myerror=NULL)
+
 # Reactive object with the full dataset
 # This object is activated when you upload some data
 rawData <- reactive({
@@ -195,6 +200,10 @@ observe({
   }
 })
 
+#---------------------#
+# PROTOCOL GENERATION #
+#---------------------#
+
 # Generate protocol file from user choices like filters, transformation type etc.
 protocolFile <- reactive({
   # filter must be treated separately because of the original format of protocol file
@@ -222,9 +231,9 @@ if(input$trait!=""){
 }
 })
 
-#----------------------------------------------#
-#   CREATING TRAITOBJECT FILTERING RAW DATA    #
-#----------------------------------------------#
+#------------------------------------------#
+#   CREATING TRAITOBJECT USING PROTOCOL    #
+#------------------------------------------#
 
 # Reduce dataset according to protocol specification
   # remove missing sex specification
@@ -371,7 +380,7 @@ observeEvent(input$deleteattempt , {
 #   SEX DIFFERENCE PLOT    #
 #--------------------------#
 
-
+# This closure is a generator of empty plots with a message
 emptyPlotter <-function(message){
   renderPlot({
       par(mar = c(0,0,0,0))
@@ -541,67 +550,142 @@ output$normalizationSideEffect <- renderPrint({
   return(outputList)
 })
 
+#-------------------------------#
+#   NORMALIZATION TEST TABLE    #
+#-------------------------------#
+
 # Apply all normalization and calculate normality test
 # The output is a table with the pvalue for every transformation
 # Yellow color is a NON significant pvalue (that's what we are interested in)
-output$normalTable <- DT::renderDataTable({
+# output$normalTable <- DT::renderDataTable({
+output$normalTable <- renderUI({
   if(is.null(rawData())){
     return(NULL)
   }
-  if(input$sexStratFlag=="Yes"){
-    Transformation <- names(normalizationFunctionsList)
-    females<-which(traitObject()$sex==2)
-    males<-which(traitObject()$sex==1)
-    loop <- c("Males" , "Females")
-    normalTable <- lapply(loop , function(sex) {
-      lapply(Transformation , function(trans) {
-          subs <- if(sex=="Males") males else if(sex=="Females") females else stop("Error in loop")
-          x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=trans)$norm_data
-          ad <- tryCatch(ad.test(x)$p.value , error=function(e) e)
-          sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) e)
-          # ks is annoying with warnings in case of ties, so I suppress them
-          ks <- suppressWarnings({
-                  tryCatch(ks.test(x,rnorm(50))$p.value, error=function(e) e)
-                })
-          return(c(sex , trans , ad , sw , ks))
+  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+    if(input$sexStratFlag=="Yes"){
+      Transformation <- names(normalizationFunctionsList)
+      females<-which(traitObject()$sex==2)
+      males<-which(traitObject()$sex==1)
+      loop <- c("Males" , "Females")
+      normalTable <- lapply(loop , function(sex) {
+        lapply(Transformation , function(trans) {
+            subs <- if(sex=="Males") males else if(sex=="Females") females else stop("Error in loop")
+            x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=trans)$norm_data
+            ad <- tryCatch(ad.test(x)$p.value , error=function(e) NA)
+            sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) NA)
+            # ks is annoying with warnings in case of ties, so I suppress them
+            ks <- suppressWarnings({
+                    tryCatch(ks.test(x,rnorm(50))$p.value, error=function(e) NA)
+                  })
+            return(c(sex , trans , ad , sw , ks))
+          })
         })
-      })
-    normalTable <- lapply(normalTable , function(x) do.call("rbind" , x))
-    normalTable <- do.call("rbind" , normalTable)
-    colnames(normalTable) <- c("Sex" 
-                              , "Transformation" 
-                              , "Anderson-Darling Test" 
-                              , "Shapiro-Wilks Test" 
-                              , "Kolmogorov-Smirnov Test")
-  } else if(input$sexStratFlag=="No") {
-    Transformation <- names(normalizationFunctionsList)
-    normalTable <- lapply(Transformation , function(trans) {
-          x <- normalizeTraitData(trait=traitObject()$trait , tm=trans)$norm_data
-          ad <- tryCatch(ad.test(x)$p.value , error=function(e) e)
-          sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) e)
-          # ks is annoying with warnings in case of ties, so I suppress them
-          ks <- suppressWarnings({
-                  tryCatch(ks.test(x,rnorm(50))$p.value, error=function(e) e)
-                })
-          return(c(trans , ad , sw , ks))
-        })
-    normalTable <- do.call("rbind" , normalTable)
-    colnames(normalTable) <- c("Transformation" 
-                              , "Anderson-Darling Test" 
-                              , "Shapiro-Wilks Test" 
-                              , "Kolmogorov-Smirnov Test")
-  }
-  return({
-      DT::datatable(normalTable) %>% 
-            formatStyle("Anderson-Darling Test" 
-                , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
-            formatStyle("Shapiro-Wilks Test" 
-                , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
-            formatStyle("Kolmogorov-Smirnov Test" 
-                , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow')))
+      normalTable <- lapply(normalTable , function(x) do.call("rbind" , x))
+      normalTable <- do.call("rbind" , normalTable)
+      colnames(normalTable) <- c("Sex" 
+                                , "Transformation" 
+                                , "Anderson-Darling Test" 
+                                , "Shapiro-Wilks Test" 
+                                , "Kolmogorov-Smirnov Test")
+    } else if(input$sexStratFlag=="No") {
+      Transformation <- names(normalizationFunctionsList)
+      normalTable <- lapply(Transformation , function(trans) {
+            x <- normalizeTraitData(trait=traitObject()$trait , tm=trans)$norm_data
+            ad <- tryCatch(ad.test(x)$p.value , error=function(e) NA)
+            sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) NA)
+            # ks is annoying with warnings in case of ties, so I suppress them
+            ks <- suppressWarnings({
+                    tryCatch(ks.test(x,rnorm(50))$p.value, error=function(e) NA)
+                  })
+            return(c(trans , ad , sw , ks))
+          })
+      normalTable <- do.call("rbind" , normalTable)
+      print(str(normalTable))
+      colnames(normalTable) <- c("Transformation" 
+                                , "Anderson-Darling Test" 
+                                , "Shapiro-Wilks Test" 
+                                , "Kolmogorov-Smirnov Test")
+    }
+    output$singleNormalTable <- DT::renderDataTable({
+              DT::datatable(normalTable) %>% 
+              formatStyle("Anderson-Darling Test" 
+                  , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
+              formatStyle("Shapiro-Wilks Test" 
+                  , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
+              formatStyle("Kolmogorov-Smirnov Test" 
+                  , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow')))
+              })
+    return({
+      tagList(DT::dataTableOutput("singleNormalTable")
+              ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)")
+              ,helpText("Empty cells means that the test could not be evaluated")) 
+              })
+  } else {
+    tabs <- lapply(names(traitObject()) , function(strat) {
+      if(input$sexStratFlag=="Yes"){
+        Transformation <- names(normalizationFunctionsList)
+        females<-which(traitObject()[[strat]]$sex==2)
+        males<-which(traitObject()[[strat]]$sex==1)
+        loop <- c("Males" , "Females")
+        normalTable <- lapply(loop , function(sex) {
+          lapply(Transformation , function(trans) {
+              subs <- if(sex=="Males") males else if(sex=="Females") females else stop("Error in loop")
+              x <- normalizeTraitData(trait=traitObject()[[strat]]$trait[subs] , tm=trans)$norm_data
+              ad <- tryCatch(ad.test(x)$p.value , error=function(e) NA)
+              sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) NA)
+              # ks is annoying with warnings in case of ties, so I suppress them
+              ks <- suppressWarnings({
+                      tryCatch(ks.test(x,rnorm(50))$p.value, error=function(e) NA)
+                    })
+              return(c(sex , trans , ad , sw , ks))
             })
-} 
-)
+          })
+        normalTable <- lapply(normalTable , function(x) do.call("rbind" , x))
+        normalTable <- do.call("rbind" , normalTable)
+        colnames(normalTable) <- c("Sex" 
+                                  , "Transformation" 
+                                  , "Anderson-Darling Test" 
+                                  , "Shapiro-Wilks Test" 
+                                  , "Kolmogorov-Smirnov Test")
+      } else if(input$sexStratFlag=="No") {
+        Transformation <- names(normalizationFunctionsList)
+        normalTable <- lapply(Transformation , function(trans) {
+              x <- normalizeTraitData(trait=traitObject()[[strat]]$trait , tm=trans)$norm_data
+              ad <- tryCatch(ad.test(x)$p.value , error=function(e) NA)
+              sw <- tryCatch(shapiro.test(x)$p.value, error=function(e) NA)
+              # ks is annoying with warnings in case of ties, so I suppress them
+              ks <- suppressWarnings({
+                      tryCatch(ks.test(x,rnorm(50))$p.value, error=function(e) NA)
+                    })
+              return(c(trans , ad , sw , ks))
+            })
+        normalTable <- do.call("rbind" , normalTable)
+        print(str(normalTable))
+        colnames(normalTable) <- c("Transformation" 
+                                  , "Anderson-Darling Test" 
+                                  , "Shapiro-Wilks Test" 
+                                  , "Kolmogorov-Smirnov Test")
+      }
+      output[[paste0("normalTable_" , strat)]] <- DT::renderDataTable({
+                DT::datatable(normalTable) %>% 
+                formatStyle("Anderson-Darling Test" 
+                    , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
+                formatStyle("Shapiro-Wilks Test" 
+                    , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
+                formatStyle("Kolmogorov-Smirnov Test" 
+                    , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow')))
+                })
+      return({
+        tabPanel(strat 
+              , DT::dataTableOutput(paste0("normalTable_" , strat))
+              ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)")
+              ,helpText("Empty cells means that the test could not be evaluated"))
+                })
+    })
+    do.call(tabsetPanel , tabs)
+  }
+})
 
 # JUST FOR CONTROL, GOTTA REMOVE IT IN RELEASE VERSION
 # output$traitObject2 <- renderTable({
