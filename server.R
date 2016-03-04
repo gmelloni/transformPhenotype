@@ -111,18 +111,27 @@ rawData <- reactive({
     return(NULL)
   }
   out$sex <- suppressWarnings( as.numeric(out$sex) )
-  dferror$myerror <- paste("DATA LOADED CORRECTLY:"
-                          ,"Numeric Traits:" %++% length(which(sapply(out , class)=="numeric"))
-                          # ,"Sex detected:" %++% c("Yes" , "No")[as.numeric(any(colnames(out)=="sex"))+1]
-                          # ,"Age detected:" %++% c("Yes" , "No")[as.numeric(any(colnames(out)=="age"))+1]
-                          # ,"Stratification Variables:" %++% length(which(sapply(out , class)=="character")) - 1
-                          , sep="\n")
-  print(dferror$myerror)
+  if("age" %in% colnames(out))
+    out$age <- suppressWarnings( as.numeric(out$age) )
+  numTraits <- sapply(out[ , colnames(out) %notin% c("age" , "sex")] , class) %in% c("numeric" , "integer") %>%
+                which %>%
+                length
+  numStrats <- (length(which(sapply(out , class)=="character")) - 1)
+  dferror$myerror <- c(
+    "DATA LOADED CORRECTLY:"
+    ,"Numeric Traits (excluding sex and age):" %++% numTraits
+    ,"Sex detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="sex"))+1]
+    ,"Age detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="age"))+1]
+    ,"Stratification Variables:" %++% numStrats
+                          # , sep="\n"
+                          )
+  # dferror$myerror <- str(out)
+  # print(dferror$myerror)
   return(out)
 })
 # What was wrong with my data?
 # Error message about format is stored together with rawData() reactive object
-output$dferror <- renderPrint(dferror$myerror)
+output$dferror <- renderPrint(cat(dferror$myerror , sep="\n"))
 
 # Reactive column of the chosen trait
 mytrait <- reactive({
@@ -246,6 +255,8 @@ if(input$trait!=""){
   # remove absolute outliers
   # remove tails according to SD specifications
     # note: the SD filter is influenced by stratification by sex
+# If input$stratifier is not set or is NA, the result is a dataframe
+# If input$stratifier is set the result is a list of dataframe
 traitObject <- reactive({
   if(is.null(rawData())){
       return(NULL)
@@ -444,6 +455,83 @@ output$sexplot <- renderUI({
   }
 })
 
+
+##### IN DEVELOPMENT
+# output$transformer <- renderUI({
+#   if(is.null(rawData())){
+#     output$transformerempty <- emptyPlotter("No Data Yet")
+#     return(
+#     plotOutput("transformerempty" , height="800px")
+#     )
+#   }
+#   # Protocol Variables
+#   currTrait <- protocolFile()$trait
+#   traitUnit <- protocolFile()$units
+#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+#   transformMethod <- protocolFile()$transformation_method
+#   # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
+#   output$transformersingleplot <- renderPlot({
+#     return({
+#       if(input$sexStratFlag=="Yes"){
+#         females<-which(traitObject()$sex==2)
+#         males<-which(traitObject()$sex==1)
+#         loop <- c("Males" , "Females")
+#         par(mfrow=c(4,2))
+#       } else {
+#         loop <- "No Stratification"
+#         par(mfrow=c(2,2))
+#       }
+#       for(i in loop){
+#         subs <- if(i=="Males") {
+#                   males 
+#                 } else if(i=="Females"){
+#                   females
+#                 } else {
+#                   1:length(traitObject()$trait)
+#                 }
+#         x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#         if(length(x)>5000){
+#           x <- x[1:5000]
+#         }
+#         plot( x=1:length(x)
+#             , y=x
+#             , xlab="Index"
+#             , ylab=traitLabelFull
+#             , main=paste(i , "ScatterPlot" , paste("N =" , length(x)) , sep="\n")
+#             , col=if(i=="Males") "navy" else if(i=="Females") "red" else "black")
+#         boxplot( x=x
+#                 , main=paste(i , "Boxplot" , sep="\n")
+#                 , col="cyan")
+#         mymin=round(min(x),2)
+#         mymax=round(max(x),2)
+#         mymean=round(mean(x),2)
+#         mysd=round(sqrt(var(x)),2)
+#         mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)
+#         hist( x=x
+#             , main=paste(i , mymain , sep="\n")
+#             , xlab=traitLabelFull
+#             , prob=TRUE)
+#         m <- mean(x, na.rm=TRUE)
+#         std <- sd(x,na.rm=TRUE) 
+#         curve(dnorm(x,mean=m,sd=std)
+#             , add=T
+#             , col="forestgreen"
+#             , lwd=4)
+#         #pv<-as.numeric(unlist(shapiro.test(x))[2])
+#         pv<-as.numeric(unlist(ad.test(x))[2])
+#         mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)"
+#           ,format(pv,digits=3,sci = T))
+#         qqnorm(x
+#               ,main=paste(i , mymain , sep="\n"))
+#         qqline(x 
+#               ,col=if(i=="Males") "navy" else if(i=="Females") "red" else "black"
+#               , lwd=4)
+#       }
+#     })
+#   })
+
+# })
+
 # Plot data according to normalization criterion
 output$transformedplot <- renderPlot({
   if(is.null(rawData())){
@@ -566,7 +654,10 @@ output$normalizationSideEffect <- renderPrint({
 # output$normalTable <- DT::renderDataTable({
 output$normalTable <- renderUI({
   if(is.null(rawData())){
-    return(NULL)
+    output$normalTableEmpty <- emptyPlotter("No Data Yet")
+    return(
+    plotOutput("normalTableEmpty" , height="800px")
+    )
   }
   if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
     if(input$sexStratFlag=="Yes"){
