@@ -142,6 +142,7 @@
   }
 }
 
+# Stolen from plyr package, just changed the default warn_missing to FALSE
 .mymapvalues <- function (x, from, to, warn_missing = FALSE) 
 {
     if (length(from) != length(to)) {
