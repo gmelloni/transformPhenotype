@@ -126,8 +126,9 @@ shinyUI(
             ,mainPanel(
               tabsetPanel(
                 type = "tabs"
-                ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")) 
-                                          , verbatimTextOutput("dferror"))
+                ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")
+                                          , verbatimTextOutput("dferror")
+                                          ))
                 # , tabPanel("Protocol" , fluidPage(tableOutput("protocolFile")))
                 , tabPanel("Gender Difference" , fluidPage(
                     # plotOutput("sexplot",height = "800px")
