@@ -455,14 +455,90 @@ output$sexplot <- renderUI({
   }
 })
 
-
+mytransform <- reactiveValues(transformer = NULL)
 ##### IN DEVELOPMENT
-# output$transformer <- renderUI({
+output$transformer <- renderUI({
+  if(is.null(rawData())){
+    output$transformerempty <- emptyPlotter("No Data Yet")
+    return(
+    fludifPage(plotOutput("transformerempty" , height="800px"))
+    )
+  }
+  # Protocol Variables
+  currTrait <- protocolFile()$trait
+  traitUnit <- protocolFile()$units
+  traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+  transformMethod <- protocolFile()$transformation_method
+  # Initialize transformation side effect output
+  outputList <- list(paste(transformMethod , "further Normalization Info:"))
+  if(input$sexStratFlag=="Yes"){
+    females<-which(traitObject()$sex==2)
+    males<-which(traitObject()$sex==1)
+    loop <- c("Males" , "Females")
+  } else {
+    loop <- "No Stratification"
+  }
+  forPlotandTable <- lapply(loop , function(i){
+       subs <- if(i=="Males") {
+                  males 
+                } else if(i=="Females"){
+                  females
+                } else {
+                  1:length(traitObject()$trait)
+                }
+        x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
+        if(length(x)>1){
+          outputList <<- c(outputList , list(i) , list(x[-1]))
+        } else {
+          outputList <<- c(outputList , list(i) , list("No other Info"))
+        }
+        x <- x$norm_data
+        return(x)
+  })
+  names(forPlotandTable) <- loop
+  # Store all the output of the transformation, I am sure is going to be useful
+  mytransform$transformer <- forPlotandTable
+  # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
+  output$transformersingleplot <- renderPlot({
+    return({
+      if(input$sexStratFlag=="Yes"){
+        loop <- c("Males" , "Females")
+        par(mfrow=c(4,2))
+      } else {
+        loop <- "No Stratification"
+        par(mfrow=c(2,2))
+      }
+      for(i in loop){
+        normalizationPlot( x = forPlotandTable[[i]] , i = i , traitLabelFull = traitLabelFull)
+      }
+      })
+  })
+  # Display all the residual output from transformation (see box cox example)
+  output$normalizationSideEffect <- renderPrint({
+    if(is.null(traitObject())){
+      return(NULL)
+    }
+    return(outputList)
+  })
+  return({
+    fluidPage(
+      plotOutput("transformersingleplot",height = "800px")
+      ,tags$hr()
+      ,verbatimTextOutput("normalizationSideEffect")
+    )
+  })
+})
+
+# Plot data according to normalization criterion
+# output$transformedplot <- renderPlot({
 #   if(is.null(rawData())){
-#     output$transformerempty <- emptyPlotter("No Data Yet")
-#     return(
-#     plotOutput("transformerempty" , height="800px")
-#     )
+#     return({
+#       par(mar = c(0,0,0,0))
+#       plot(c(0, 1), c(0, 1)
+#           , ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       text(x = 0.5, y = 0.5, "No data yet"
+#         ,cex = 3, col = "black")
+#     })
 #   }
 #   # Protocol Variables
 #   currTrait <- protocolFile()$trait
@@ -470,7 +546,6 @@ output$sexplot <- renderUI({
 #   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
 #   transformMethod <- protocolFile()$transformation_method
 #   # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
-#   output$transformersingleplot <- renderPlot({
 #     return({
 #       if(input$sexStratFlag=="Yes"){
 #         females<-which(traitObject()$sex==2)
@@ -528,121 +603,43 @@ output$sexplot <- renderUI({
 #               , lwd=4)
 #       }
 #     })
-#   })
-
 # })
-
-# Plot data according to normalization criterion
-output$transformedplot <- renderPlot({
-  if(is.null(rawData())){
-    return({
-      par(mar = c(0,0,0,0))
-      plot(c(0, 1), c(0, 1)
-          , ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      text(x = 0.5, y = 0.5, "No data yet"
-        ,cex = 3, col = "black")
-    })
-  }
-  # Protocol Variables
-  currTrait <- protocolFile()$trait
-  traitUnit <- protocolFile()$units
-  traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
-  transformMethod <- protocolFile()$transformation_method
-  # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
-    return({
-      if(input$sexStratFlag=="Yes"){
-        females<-which(traitObject()$sex==2)
-        males<-which(traitObject()$sex==1)
-        loop <- c("Males" , "Females")
-        par(mfrow=c(4,2))
-      } else {
-        loop <- "No Stratification"
-        par(mfrow=c(2,2))
-      }
-      for(i in loop){
-        subs <- if(i=="Males") {
-                  males 
-                } else if(i=="Females"){
-                  females
-                } else {
-                  1:length(traitObject()$trait)
-                }
-        x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-        if(length(x)>5000){
-          x <- x[1:5000]
-        }
-        plot( x=1:length(x)
-            , y=x
-            , xlab="Index"
-            , ylab=traitLabelFull
-            , main=paste(i , "ScatterPlot" , paste("N =" , length(x)) , sep="\n")
-            , col=if(i=="Males") "navy" else if(i=="Females") "red" else "black")
-        boxplot( x=x
-                , main=paste(i , "Boxplot" , sep="\n")
-                , col="cyan")
-        mymin=round(min(x),2)
-        mymax=round(max(x),2)
-        mymean=round(mean(x),2)
-        mysd=round(sqrt(var(x)),2)
-        mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)
-        hist( x=x
-            , main=paste(i , mymain , sep="\n")
-            , xlab=traitLabelFull
-            , prob=TRUE)
-        m <- mean(x, na.rm=TRUE)
-        std <- sd(x,na.rm=TRUE) 
-        curve(dnorm(x,mean=m,sd=std)
-            , add=T
-            , col="forestgreen"
-            , lwd=4)
-        #pv<-as.numeric(unlist(shapiro.test(x))[2])
-        pv<-as.numeric(unlist(ad.test(x))[2])
-        mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)"
-          ,format(pv,digits=3,sci = T))
-        qqnorm(x
-              ,main=paste(i , mymain , sep="\n"))
-        qqline(x 
-              ,col=if(i=="Males") "navy" else if(i=="Females") "red" else "black"
-              , lwd=4)
-      }
-    })
-})
 
 # The output of every normalization function is a list
 # This list contains norm_data as the first element
 # The other elements are optional
 # In case they are present they will be displayed as a html box at the bottom
 # An example is box_cox that report the optimal cut off
-output$normalizationSideEffect <- renderPrint({
-  if(is.null(traitObject())){
-    return(NULL)
-  }
-  transformMethod <- protocolFile()$transformation_method
-  outputList <- list(paste(transformMethod , "further Normalization Info:"))
-  if(input$sexStratFlag=="Yes"){
-    females<-which(traitObject()$sex==2)
-    males<-which(traitObject()$sex==1)
-    loop <- c("Males" , "Females")
-  } else {
-    loop <- "No Stratification"
-  }
-  for(i in loop){
-    subs <- if(i=="Males") {
-                males 
-              } else if(i=="Females"){
-                females
-              } else {
-                1:length(traitObject()$trait)
-              }
-    x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
-    if(length(x)>1){
-      outputList <- c(outputList , list(i) , list(x[-1]))
-    } else {
-      outputList <- c(outputList , list(i) , list("No other Info"))
-    }
-  }
-  return(outputList)
-})
+# output$normalizationSideEffect <- renderPrint({
+#   if(is.null(traitObject())){
+#     return(NULL)
+#   }
+#   transformMethod <- protocolFile()$transformation_method
+#   outputList <- list(paste(transformMethod , "further Normalization Info:"))
+#   if(input$sexStratFlag=="Yes"){
+#     females<-which(traitObject()$sex==2)
+#     males<-which(traitObject()$sex==1)
+#     loop <- c("Males" , "Females")
+#   } else {
+#     loop <- "No Stratification"
+#   }
+#   for(i in loop){
+#     subs <- if(i=="Males") {
+#                 males 
+#               } else if(i=="Females"){
+#                 females
+#               } else {
+#                 1:length(traitObject()$trait)
+#               }
+#     x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
+#     if(length(x)>1){
+#       outputList <- c(outputList , list(i) , list(x[-1]))
+#     } else {
+#       outputList <- c(outputList , list(i) , list("No other Info"))
+#     }
+#   }
+#   return(outputList)
+# })
 
 #-------------------------------#
 #   NORMALIZATION TEST TABLE    #

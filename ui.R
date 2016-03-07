@@ -135,11 +135,13 @@ shinyUI(
                     uiOutput("sexplot")
                     )
                   )
-                , tabPanel("Data Plot" , fluidPage(
-                        plotOutput("transformedplot",height = "800px")
-                        ,tags$hr()
-                        ,verbatimTextOutput("normalizationSideEffect")
-                        ))
+                , tabPanel("Data Plot" ,uiOutput("transformer")
+                  # , fluidPage(
+                  #       plotOutput("transformedplot",height = "800px")
+                  #       ,tags$hr()
+                  #       ,verbatimTextOutput("normalizationSideEffect")
+                  #   )
+                  )
                 , tabPanel("Normality Summary" , fluidPage(
                     uiOutput("normalTable")
                     # DT::dataTableOutput("normalTable")
