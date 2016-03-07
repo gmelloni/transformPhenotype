@@ -111,7 +111,6 @@ checkCovariates2<-function(covs,x,normx){
 	cl<-list()
 	for(xx in covListInternal){
 			l<-list(name=xx,pval=NA)
-			# assign(covListInternal[xx],x[,grep(paste("^",covListInternal[xx],"$",sep=""),tolower(names(x)))])
 			assign(xx , x[ , xx])
 			cl<-c(cl,list(l))
 	}
@@ -130,20 +129,13 @@ checkCovariates2<-function(covs,x,normx){
 
 # Given covariates and normalized data, return a vector of covariates
 # significant in the linear model
-checkCovariates<-function(covs,x,normx,sxf){
+checkCovariates<-function(covs,x,normx){
+	# browser()
 	returnStr <- character()
 	covListInternal<-tolower(unlist(strsplit(covs$covariates,",")))
 	cl<-list()
-	
-	# if(!is.na(covs$age2Flag)){
-	# 	age2 <- x$age^2
-	# 	l<-list(name="age2",pval=NA)
-	# 	cl<-c(cl,list(l))
-	# 	# covListInternal<-covListInternal[-match("age2",covListInternal)]
-	# }
 	for(xx in covListInternal){
 			l<-list(name=xx,pval=NA)
-			# assign(covListInternal[xx],x[,grep(paste("^",covListInternal[xx],"$",sep=""),tolower(names(x)))])
 			assign(xx , x[ , xx])
 			cl<-c(cl,list(l))
 	}
@@ -157,13 +149,7 @@ checkCovariates<-function(covs,x,normx,sxf){
 	}
 	covStr<- as.formula(f)
 	tst <- summary(lm(covStr))
-	# print(str(tst))
-	# lc<-length(tst$coefficients)
-	# print(lc)
-	# print(tst$coefficients)
-	# numCovs<-(lc/4)-1
 	for(zz in 1:length(cl)){
-		# pv<-tst$coefficients[(lc-numCovs)+zz]
 		pv<-tst$coefficients[cl[[zz]]$name , "Pr(>|t|)"]
 		if(pv<0.05){
 			returnStr<-c(returnStr,cl[[zz]]$name)
@@ -172,23 +158,12 @@ checkCovariates<-function(covs,x,normx,sxf){
 	if(length(returnStr)==0){
 		returnStr <- NA
 	}
-	return(returnStr)
+	return(list(summary=tst , signCov=returnStr))
 }
 
-checkResiduals<-function(x,dataObject,sex){
+checkResiduals<-function(x,dataObject){
 	ztestres<-(x-mean(x, na.rm=T)) / sd(x, na.rm=T)
-	pv<-as.numeric(unlist(shapiro.test(ztestres))[2])
-	# if(is.na(initialResidualsPvalGL)){
-	# 	initialResidualsPvalGL <<- paste(sex,format(pv,digits=3,sci=TRUE))
-	# }else{
-	# 	initialResidualsPvalGL <<- c(initialResidualsPvalGL,paste(",",sex,format(pv,digits=3,sci=TRUE)))
-	# }
-	# if(pv < 0.05){
-	# 	resList<-promptUserResiduals(x,sex,pv,ztestres)
-	# 	# Ask user whether they want to renormalize the residuals
-	# 	x=resList$x
-	# 	ztestres=resList$zx
-	# }
+	# pv<-as.numeric(unlist(shapiro.test(ztestres))[2])
 	ready_residuals<-cbind(ID=as.character(dataObject[,1]),res=x,zres=ztestres)
 	retList <- list("outputData" = ready_residuals, "normResiduals" = x)
 	return(retList)
@@ -309,44 +284,51 @@ plotRawData<-function(x,tl,tlf,sex,type){
 	return(pv)
 }
 
-plotResidualData<-function(tl,tlf,cvs,res,normx){
+# plotResidualData<-function(tl,tlf,cvs,res,normx){
 
-		# out<-paste(tl,"_",project,"_",sex,"plotsRes.png",sep="")
-		# png(out,height=600,width=600)
-		x<-(res-mean(res, na.rm=T)) / sd(res, na.rm=T)
-		#x<-res
+# 		# out<-paste(tl,"_",project,"_",sex,"plotsRes.png",sep="")
+# 		# png(out,height=600,width=600)
+# 		x<-(res-mean(res, na.rm=T)) / sd(res, na.rm=T)
+# 		#x<-res
+# 		par(mfrow=c(2,2))
+# 		plot(1:length(x),x,xlab="Index",ylab=tl)
+# 		mymin=round(min(x),2)
+# 		mymax=round(max(x),2)
+# 		mymean=round(mean(x),2)
+# 		mysd=round(sqrt(var(x)),2)
+# 		mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)	
+# 		hist(x,main=mymain,xlab=tl,prob=TRUE)
+# 		m <- mean(x, na.rm=TRUE)
+# 		std<-sd(x,na.rm=TRUE)
+# 		curve(dnorm(x,mean=m,sd=std),add=T, col="forestgreen", lwd=2)
+# 		# pv<-as.numeric(unlist(shapiro.test(x))[2])
+# 		pv <- tryCatch(as.numeric(unlist(ad.test(x))[2]) , error=function(e) "NA")
+# 		mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)",format(pv,digits=3,sci = TRUE))
+# 		qqnorm(x,main=mymain)
+# 		qqline(x , col="red" , lwd=2)
+# 		if(!is.null(cvs)){
+# 			test<-lm(cvs)
+# 			plot(test,which=1)
+# 		} else {
+# 			plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       		text(x = 0.5, y = 0.5, "No Significant Covariate",cex = 1.6, col = "black")
+# 		}
+# 		# par(mfrow=c(1,1))
+# 		# invisible()
+# 		# dev.off()
+# }
+
+plotResidual2 <- function(tl,tlf,myList,sexStratFlag){
+	if(sexStratFlag=="Yes"){
+		par(mfrow=c(4,2))
+	} else {
 		par(mfrow=c(2,2))
-		plot(1:length(x),x,xlab="Index",ylab=tl)
-		mymin=round(min(x),2)
-		mymax=round(max(x),2)
-		mymean=round(mean(x),2)
-		mysd=round(sqrt(var(x)),2)
-		mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)	
-		hist(x,main=mymain,xlab=tl,prob=TRUE)
-		m <- mean(x, na.rm=TRUE)
-		std<-sd(x,na.rm=TRUE)
-		curve(dnorm(x,mean=m,sd=std),add=T, col="forestgreen", lwd=2)
-		# pv<-as.numeric(unlist(shapiro.test(x))[2])
-		pv<-as.numeric(unlist(ad.test(x))[2])
-		mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)",format(pv,digits=3,sci = TRUE))
-		qqnorm(x,main=mymain)
-		qqline(x , col="red" , lwd=2)
-		if(!is.null(cvs)){
-			test<-lm(cvs)
-			plot(test,which=1)
-		} else {
-			plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      		text(x = 0.5, y = 0.5, "No Significant Covariate",cex = 1.6, col = "black")
-		}
-		# par(mfrow=c(1,1))
-		# invisible()
-		# dev.off()
-}
-
-plotResidualDataBySex <- function(tl,tlf,myList){
-	par(mfrow=c(4,2))
+	}
 	for(i in names(myList)){
-		color <- if(i=="Males") "navy" else if(i=="Females") "red"
+		color <- switch(i
+            			,"Males" = "navy"
+            			,"Females" = "red"
+            			,"black")
 		cvs <- myList[[i]]$covString
 		res <- myList[[i]]$normResiduals
 		normx <- myList[[i]]$normData
@@ -365,7 +347,7 @@ plotResidualDataBySex <- function(tl,tlf,myList){
 		std<-sd(x,na.rm=TRUE)
 		curve(dnorm(x,mean=m,sd=std),add=T, col="forestgreen", lwd=2)
 	# Plot standardized quantiles compared with normal quantiles
-		pv<-as.numeric(unlist(ad.test(x))[2])
+		pv <- tryCatch(as.numeric(unlist(ad.test(x))[2]) , error=function(e) "NA")
 		mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)",format(pv,digits=3,sci = TRUE))
 		mymain <- paste(i , mymain , sep="\n")
 		qqnorm(x,main=mymain)
