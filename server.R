@@ -456,7 +456,7 @@ output$sexplot <- renderUI({
 })
 
 # mytransform <- reactiveValues(transformer = NULL)
-##### IN DEVELOPMENT
+##### render of the tab Data Plot tab
 output$transformer <- renderUI({
   if(is.null(rawData())){
     output$transformerempty <- emptyPlotter("No Data Yet")
@@ -592,121 +592,6 @@ output$transformer <- renderUI({
   return(do.call(tabsetPanel , tabs))
   }
 })
-
-
-###################### OLD VERSION DEPRECATED START
-# Plot data according to normalization criterion
-# output$transformedplot <- renderPlot({
-#   if(is.null(rawData())){
-#     return({
-#       par(mar = c(0,0,0,0))
-#       plot(c(0, 1), c(0, 1)
-#           , ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-#       text(x = 0.5, y = 0.5, "No data yet"
-#         ,cex = 3, col = "black")
-#     })
-#   }
-#   # Protocol Variables
-#   currTrait <- protocolFile()$trait
-#   traitUnit <- protocolFile()$units
-#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
-#   transformMethod <- protocolFile()$transformation_method
-#   # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
-#     return({
-#       if(input$sexStratFlag=="Yes"){
-#         females<-which(traitObject()$sex==2)
-#         males<-which(traitObject()$sex==1)
-#         loop <- c("Males" , "Females")
-#         par(mfrow=c(4,2))
-#       } else {
-#         loop <- "No Stratification"
-#         par(mfrow=c(2,2))
-#       }
-#       for(i in loop){
-#         subs <- if(i=="Males") {
-#                   males 
-#                 } else if(i=="Females"){
-#                   females
-#                 } else {
-#                   1:length(traitObject()$trait)
-#                 }
-#         x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-#         if(length(x)>5000){
-#           x <- x[1:5000]
-#         }
-#         plot( x=1:length(x)
-#             , y=x
-#             , xlab="Index"
-#             , ylab=traitLabelFull
-#             , main=paste(i , "ScatterPlot" , paste("N =" , length(x)) , sep="\n")
-#             , col=if(i=="Males") "navy" else if(i=="Females") "red" else "black")
-#         boxplot( x=x
-#                 , main=paste(i , "Boxplot" , sep="\n")
-#                 , col="cyan")
-#         mymin=round(min(x),2)
-#         mymax=round(max(x),2)
-#         mymean=round(mean(x),2)
-#         mysd=round(sqrt(var(x)),2)
-#         mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)
-#         hist( x=x
-#             , main=paste(i , mymain , sep="\n")
-#             , xlab=traitLabelFull
-#             , prob=TRUE)
-#         m <- mean(x, na.rm=TRUE)
-#         std <- sd(x,na.rm=TRUE) 
-#         curve(dnorm(x,mean=m,sd=std)
-#             , add=T
-#             , col="forestgreen"
-#             , lwd=4)
-#         #pv<-as.numeric(unlist(shapiro.test(x))[2])
-#         pv<-as.numeric(unlist(ad.test(x))[2])
-#         mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)"
-#           ,format(pv,digits=3,sci = T))
-#         qqnorm(x
-#               ,main=paste(i , mymain , sep="\n"))
-#         qqline(x 
-#               ,col=if(i=="Males") "navy" else if(i=="Females") "red" else "black"
-#               , lwd=4)
-#       }
-#     })
-# })
-
-# The output of every normalization function is a list
-# This list contains norm_data as the first element
-# The other elements are optional
-# In case they are present they will be displayed as a html box at the bottom
-# An example is box_cox that report the optimal cut off
-# output$normalizationSideEffect <- renderPrint({
-#   if(is.null(traitObject())){
-#     return(NULL)
-#   }
-#   transformMethod <- protocolFile()$transformation_method
-#   outputList <- list(paste(transformMethod , "further Normalization Info:"))
-#   if(input$sexStratFlag=="Yes"){
-#     females<-which(traitObject()$sex==2)
-#     males<-which(traitObject()$sex==1)
-#     loop <- c("Males" , "Females")
-#   } else {
-#     loop <- "No Stratification"
-#   }
-#   for(i in loop){
-#     subs <- if(i=="Males") {
-#                 males 
-#               } else if(i=="Females"){
-#                 females
-#               } else {
-#                 1:length(traitObject()$trait)
-#               }
-#     x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
-#     if(length(x)>1){
-#       outputList <- c(outputList , list(i) , list(x[-1]))
-#     } else {
-#       outputList <- c(outputList , list(i) , list("No other Info"))
-#     }
-#   }
-#   return(outputList)
-# })
-###################### OLD VERSION DEPRECATED END
 
 
 #-------------------------------#
@@ -849,20 +734,23 @@ output$normalTable <- renderUI({
   }
 })
 
-# JUST FOR CONTROL, GOTTA REMOVE IT IN RELEASE VERSION
-# output$traitObject2 <- renderTable({
-#   head(traitObject())
-#   })
+# Keep the residual for download
+residual <- reactiveValues(df_res=NULL)
 
-# Linear Model on covariates results
-output$linearCovariates <- renderPrint({
+output$covariateAnalysis <- renderUI({
   if(is.null(rawData())){
-    return(NULL)
+    output$covariateAnalysisEmpty <- emptyPlotter("No Data Yet")
+    return(
+    plotOutput("covariateAnalysisEmpty" , height="800px")
+    )
   }
   covariates <- protocolFile()$covariates_tested
   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
   if(is.na(covariates)){
-    return(NULL)
+    output$covariateAnalysisEmpty <- emptyPlotter("No covariates selected")
+    return(
+    plotOutput("covariateAnalysisEmpty" , height="800px")
+    )
   }
   currTrait <- protocolFile()$trait
   traitUnit <- protocolFile()$units
@@ -872,141 +760,230 @@ output$linearCovariates <- renderPrint({
   covList<- list(covariates=cvr
               , age2Flag=if("age2" %in% cvr) TRUE else NA)
   if(input$sexStratFlag=="Yes"){
-    females<-which(traitObject()$sex==2)
-    males<-which(traitObject()$sex==1)
-    loop <- c("Males" , "Females")
-    normData <- lapply(list("Males"=males , "Females"=females) , function(subs) {
-        normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-        signifCovs<-checkCovariates2(covs=covList
-                                ,x=traitObject()[subs , ]
-                                ,normx=normData)
-      })
-    return(invisible(sapply(names(normData) , function(x) {
-        return(cat(toupper(x) , show(normData[[x]]) , sep="\n"))
-        }))
-    )
-  } else {
-    # subs <- 1:nrow(traitObject())
-    normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
-    signifCovs<-checkCovariates2(covs=covList
-                                ,x=traitObject()
-                                ,normx=normData)
-    return(show(signifCovs))
-  }
-})
-
-# This object is the residual table
-# It is updated every time the residualPlot changes
-residual <- reactiveValues(df_res=NULL)
-
-# Normalize data and check for residual of the covariates
-output$residualsPlot <- renderPlot({
-  if(is.null(rawData())){
-    return({
-      par(mar = c(0,0,0,0))
-      plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      text(x = 0.5, y = 0.5, "No data yet"
-        ,cex = 3, col = "black")
-    })
-  }
-  covariates <- protocolFile()$covariates_tested
-  covariates <- if(is.na(covariates) | covariates=="") NA else covariates
-  if(is.na(covariates)){
-    return({
-      par(mar = c(0,0,0,0))
-      plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-      text(x = 0.5, y = 0.5, "No covariates selected"
-        ,cex = 3, col = "black")
-    })
-  }
-  currTrait <- protocolFile()$trait
-  traitUnit <- protocolFile()$units
-  traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
-  transformMethod <- protocolFile()$transformation_method
-  if(input$sexStratFlag=="Yes"){
     cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
     if(length(cvr)==0){
-      return({
-        par(mar = c(0,0,0,0))
-        plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-        text(x = 0.5, y = 0.5, "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
-          ,cex = 3, col = "black")
-      })
+      mymex <- "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
+      output$covariateAnalysisEmpty <- emptyPlotter(mymex)
+      return(
+        plotOutput("covariateAnalysisEmpty" , height="800px")
+      )
     }
     covList<- list(covariates=cvr
-             , age2Flag=if("age2" %in% cvr) TRUE else NA)
+              , age2Flag=if("age2" %in% cvr) TRUE else NA)
     females<-which(traitObject()$sex==2)
     males<-which(traitObject()$sex==1)
     loop <- list("Males"=males , "Females"=females)
-    # loop <- c("Males" , "Females")
-    normDataListForPlot <- lapply(loop , function(subs) {
+  } else {
+    loop <- list("No Stratification"=1:nrow(traitObject()))
+  }
+  normDataListForPlot <- lapply(loop , function(subs) {
+      # browser()
       normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-      signifCovs<-checkCovariates(covs=covList
+      signifCovs <- checkCovariates(covs=covList
                                   ,x=traitObject()[subs,]
                                   ,normx=normData
-                                  ,sxf=sexStratFlag)
-      if(!is.na(signifCovs[1])){
-        resList<-applySignifCovariates(signifCovs,traitObject()[subs,],normData)
+                                  # ,sxf=sexStratFlag
+                                  )
+      if(!is.na(signifCovs[["signCov"]][1])){
+        resList<-applySignifCovariates(signifCovs[["signCov"]],traitObject()[subs,],normData)
         normResiduals<-resList$residuals
         covString <- resList$covStr
-        retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
+        retData <- checkResiduals(normResiduals,traitObject()[subs,])
         outputData <- retData$outputData
         normResiduals <- retData$normResiduals
       } else {
         normResiduals <- normData
         covString <- NULL
-        retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
+        retData <- checkResiduals(normResiduals,traitObject()[subs,])
         outputData <- retData$outputData
         normResiduals <- retData$normResiduals
       }
-      return(list(covString=covString , normResiduals=normResiduals , normData=normData , outputData=outputData))
+      return(list(signifCovs=signifCovs 
+                , covString=covString 
+                , normResiduals=normResiduals 
+                , normData=normData 
+                , outputData=outputData))
       })
+        # First checkpoint, show the summary of the linear model
+    output$linearCovariates <- renderPrint(
+      invisible(sapply(names(normDataListForPlot) , function(x) {
+                    return(cat(toupper(x) , show(normDataListForPlot[[x]][["signifCovs"]][["summary"]]) , sep="\n"))
+                  }))
+      )
     # Add a side effect for this function, by reporting the actual residual table
     outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
     observe({
       residual$df_res <- outputData
     })
-    return(plotResidualDataBySex(
+    output$residualsPlot <- renderPlot(
+      plotResidual2(
                     tl=currTrait
                     ,tlf=traitLabelFull
                     ,myList=normDataListForPlot
-                    ))
-  } else {
-    subs <- 1:nrow(traitObject())
-    normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-    cvr <- unlist(strsplit(covariates , ","))
-    covList<- list(covariates=cvr
-              , age2Flag=if("age2" %in% cvr) TRUE else NA)
-    signifCovs<-checkCovariates(covs=covList
-                                ,x=traitObject()
-                                ,normx=normData
-                                ,sxf=sexStratFlag)
-    if(!is.na(signifCovs[1])){
-      resList<-applySignifCovariates(signifCovs,traitObject(),normData)
-      normResiduals<-resList$residuals
-      covString <- resList$covStr
-      retData <- checkResiduals(normResiduals,traitObject(),"")
-      outputData <- retData$outputData
-      normResiduals <- retData$normResiduals
-    } else {
-      normResiduals <- normData
-      covString <- NULL
-      retData <- checkResiduals(normResiduals,traitObject(),"")
-      outputData <- retData$outputData
-      normResiduals <- retData$normResiduals
-    }
-    # Side effect, update residual final table
-    observe({
-      residual$df_res <- outputData
-    })
-    return(plotResidualData(tl=currTrait
-                    ,tlf=traitLabelFull
-                    # ,"No Stratification"
-                    ,cvs=covString
-                    ,res=normResiduals
-                    ,normx=normData))
-  }
+                    ,sexStratFlag=input$sexStratFlag
+                    )
+    )
+  return(fluidPage(
+          # tagfordisable2
+          downloadButton("downloadResidual" , label="Download Final Residuals")
+          ,verbatimTextOutput("linearCovariates")
+          ,plotOutput("residualsPlot", height="800px") )
+  ) 
 })
+
+# Linear Model on covariates results
+# output$linearCovariates <- renderPrint({
+#   if(is.null(rawData())){
+#     return(NULL)
+#   }
+#   covariates <- protocolFile()$covariates_tested
+#   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
+#   if(is.na(covariates)){
+#     return(NULL)
+#   }
+#   currTrait <- protocolFile()$trait
+#   traitUnit <- protocolFile()$units
+#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+#   transformMethod <- protocolFile()$transformation_method
+#   cvr <- unlist(strsplit(covariates , ","))
+#   covList<- list(covariates=cvr
+#               , age2Flag=if("age2" %in% cvr) TRUE else NA)
+#   if(input$sexStratFlag=="Yes"){
+#     females<-which(traitObject()$sex==2)
+#     males<-which(traitObject()$sex==1)
+#     loop <- c("Males" , "Females")
+#     normData <- lapply(list("Males"=males , "Females"=females) , function(subs) {
+#         normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#         signifCovs<-checkCovariates2(covs=covList
+#                                 ,x=traitObject()[subs , ]
+#                                 ,normx=normData)
+#       })
+#     return(invisible(sapply(names(normData) , function(x) {
+#         return(cat(toupper(x) , show(normData[[x]]) , sep="\n"))
+#         }))
+#     )
+#   } else {
+#     # subs <- 1:nrow(traitObject())
+#     normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
+#     signifCovs <- checkCovariates2(covs=covList
+#                                 ,x=traitObject()
+#                                 ,normx=normData)
+#     return(show(signifCovs))
+#   }
+# })
+
+# This object is the residual table
+# It is updated every time the residualPlot changes
+# residual <- reactiveValues(df_res=NULL)
+# Normalize data and check for residual of the covariates
+# output$residualsPlot <- renderPlot({
+#   if(is.null(rawData())){
+#     return({
+#       par(mar = c(0,0,0,0))
+#       plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       text(x = 0.5, y = 0.5, "No data yet"
+#         ,cex = 3, col = "black")
+#     })
+#   }
+#   covariates <- protocolFile()$covariates_tested
+#   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
+#   if(is.na(covariates)){
+#     return({
+#       par(mar = c(0,0,0,0))
+#       plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       text(x = 0.5, y = 0.5, "No covariates selected"
+#         ,cex = 3, col = "black")
+#     })
+#   }
+#   currTrait <- protocolFile()$trait
+#   traitUnit <- protocolFile()$units
+#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+#   transformMethod <- protocolFile()$transformation_method
+#   if(input$sexStratFlag=="Yes"){
+#     cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
+#     if(length(cvr)==0){
+#       return({
+#         par(mar = c(0,0,0,0))
+#         plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#         text(x = 0.5, y = 0.5, "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
+#           ,cex = 3, col = "black")
+#       })
+#     }
+#     covList<- list(covariates=cvr
+#              , age2Flag=if("age2" %in% cvr) TRUE else NA)
+#     females<-which(traitObject()$sex==2)
+#     males<-which(traitObject()$sex==1)
+#     loop <- list("Males"=males , "Females"=females)
+#     # loop <- c("Males" , "Females")
+#     normDataListForPlot <- lapply(loop , function(subs) {
+#       normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#       signifCovs<-checkCovariates(covs=covList
+#                                   ,x=traitObject()[subs,]
+#                                   ,normx=normData
+#                                   ,sxf=sexStratFlag)
+#       if(!is.na(signifCovs[1])){
+#         resList<-applySignifCovariates(signifCovs,traitObject()[subs,],normData)
+#         normResiduals<-resList$residuals
+#         covString <- resList$covStr
+#         retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
+#         outputData <- retData$outputData
+#         normResiduals <- retData$normResiduals
+#       } else {
+#         normResiduals <- normData
+#         covString <- NULL
+#         retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
+#         outputData <- retData$outputData
+#         normResiduals <- retData$normResiduals
+#       }
+#       return(list(covString=covString , normResiduals=normResiduals , normData=normData , outputData=outputData))
+#       })
+#     # Add a side effect for this function, by reporting the actual residual table
+#     outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
+#     observe({
+#       residual$df_res <- outputData
+#     })
+#     return(plotResidualDataBySex(
+#                     tl=currTrait
+#                     ,tlf=traitLabelFull
+#                     ,myList=normDataListForPlot
+#                     ))
+#   } else {
+#     # subs <- 1:nrow(traitObject())
+#     # normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#     normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
+#     cvr <- unlist(strsplit(covariates , ","))
+#     covList<- list(covariates=cvr
+#               , age2Flag=if("age2" %in% cvr) TRUE else NA)
+#     signifCovs<-checkCovariates(covs=covList
+#                                 ,x=traitObject()
+#                                 ,normx=normData
+#                                 ,sxf=sexStratFlag)
+#     if(!is.na(signifCovs[1])){
+#       resList<-applySignifCovariates(signifCovs,traitObject(),normData)
+#       normResiduals<-resList$residuals
+#       covString <- resList$covStr
+#       retData <- checkResiduals(normResiduals,traitObject(),"")
+#       outputData <- retData$outputData
+#       normResiduals <- retData$normResiduals
+#     } else {
+#       normResiduals <- normData
+#       covString <- NULL
+#       retData <- checkResiduals(normResiduals,traitObject(),"")
+#       outputData <- retData$outputData
+#       normResiduals <- retData$normResiduals
+#     }
+#     # Side effect, update residual final table
+#     observe({
+#       residual$df_res <- outputData
+#     })
+#     return(plotResidualData(tl=currTrait
+#                     ,tlf=traitLabelFull
+#                     # ,"No Stratification"
+#                     ,cvs=covString
+#                     ,res=normResiduals
+#                     ,normx=normData))
+#   }
+# })
 
 # This observer will wait for the residual table to be present
 # When this event is observed, the download button is enabled
@@ -1170,3 +1147,122 @@ session$onSessionEnded(function() {
 #   })
 # })
 # runApp(list(ui = ui, server = server))
+
+
+#-----------#
+# Data Plot #
+#-----------#
+
+###################### OLD VERSION DEPRECATED START
+# Plot data according to normalization criterion
+# output$transformedplot <- renderPlot({
+#   if(is.null(rawData())){
+#     return({
+#       par(mar = c(0,0,0,0))
+#       plot(c(0, 1), c(0, 1)
+#           , ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       text(x = 0.5, y = 0.5, "No data yet"
+#         ,cex = 3, col = "black")
+#     })
+#   }
+#   # Protocol Variables
+#   currTrait <- protocolFile()$trait
+#   traitUnit <- protocolFile()$units
+#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+#   transformMethod <- protocolFile()$transformation_method
+#   # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
+#     return({
+#       if(input$sexStratFlag=="Yes"){
+#         females<-which(traitObject()$sex==2)
+#         males<-which(traitObject()$sex==1)
+#         loop <- c("Males" , "Females")
+#         par(mfrow=c(4,2))
+#       } else {
+#         loop <- "No Stratification"
+#         par(mfrow=c(2,2))
+#       }
+#       for(i in loop){
+#         subs <- if(i=="Males") {
+#                   males 
+#                 } else if(i=="Females"){
+#                   females
+#                 } else {
+#                   1:length(traitObject()$trait)
+#                 }
+#         x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#         if(length(x)>5000){
+#           x <- x[1:5000]
+#         }
+#         plot( x=1:length(x)
+#             , y=x
+#             , xlab="Index"
+#             , ylab=traitLabelFull
+#             , main=paste(i , "ScatterPlot" , paste("N =" , length(x)) , sep="\n")
+#             , col=if(i=="Males") "navy" else if(i=="Females") "red" else "black")
+#         boxplot( x=x
+#                 , main=paste(i , "Boxplot" , sep="\n")
+#                 , col="cyan")
+#         mymin=round(min(x),2)
+#         mymax=round(max(x),2)
+#         mymean=round(mean(x),2)
+#         mysd=round(sqrt(var(x)),2)
+#         mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)
+#         hist( x=x
+#             , main=paste(i , mymain , sep="\n")
+#             , xlab=traitLabelFull
+#             , prob=TRUE)
+#         m <- mean(x, na.rm=TRUE)
+#         std <- sd(x,na.rm=TRUE) 
+#         curve(dnorm(x,mean=m,sd=std)
+#             , add=T
+#             , col="forestgreen"
+#             , lwd=4)
+#         #pv<-as.numeric(unlist(shapiro.test(x))[2])
+#         pv<-as.numeric(unlist(ad.test(x))[2])
+#         mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)"
+#           ,format(pv,digits=3,sci = T))
+#         qqnorm(x
+#               ,main=paste(i , mymain , sep="\n"))
+#         qqline(x 
+#               ,col=if(i=="Males") "navy" else if(i=="Females") "red" else "black"
+#               , lwd=4)
+#       }
+#     })
+# })
+
+# The output of every normalization function is a list
+# This list contains norm_data as the first element
+# The other elements are optional
+# In case they are present they will be displayed as a html box at the bottom
+# An example is box_cox that report the optimal cut off
+# output$normalizationSideEffect <- renderPrint({
+#   if(is.null(traitObject())){
+#     return(NULL)
+#   }
+#   transformMethod <- protocolFile()$transformation_method
+#   outputList <- list(paste(transformMethod , "further Normalization Info:"))
+#   if(input$sexStratFlag=="Yes"){
+#     females<-which(traitObject()$sex==2)
+#     males<-which(traitObject()$sex==1)
+#     loop <- c("Males" , "Females")
+#   } else {
+#     loop <- "No Stratification"
+#   }
+#   for(i in loop){
+#     subs <- if(i=="Males") {
+#                 males 
+#               } else if(i=="Females"){
+#                 females
+#               } else {
+#                 1:length(traitObject()$trait)
+#               }
+#     x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
+#     if(length(x)>1){
+#       outputList <- c(outputList , list(i) , list(x[-1]))
+#     } else {
+#       outputList <- c(outputList , list(i) , list("No other Info"))
+#     }
+#   }
+#   return(outputList)
+# })
+###################### OLD VERSION DEPRECATED END

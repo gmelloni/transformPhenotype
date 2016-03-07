@@ -135,7 +135,8 @@ shinyUI(
                     uiOutput("sexplot")
                     )
                   )
-                , tabPanel("Data Plot" ,uiOutput("transformer")
+                , tabPanel("Transform Plot" 
+                    ,uiOutput("transformer")
                   # , fluidPage(
                   #       plotOutput("transformedplot",height = "800px")
                   #       ,tags$hr()
@@ -149,11 +150,13 @@ shinyUI(
                     )
                   )
                 # , tabPanel("FilterData" , fluidPage(tableOutput("traitObject2")))
-                , tabPanel("Covariate Analysis" , fluidPage(
-                        tagfordisable2
-                        ,downloadButton("downloadResidual" , label="Download Final Residuals")
-                        ,verbatimTextOutput("linearCovariates")
-                        ,plotOutput("residualsPlot", height="800px") ))
+                , tabPanel("Covariate Analysis" , uiOutput("covariateAnalysis")
+                  # , fluidPage(
+                  #       tagfordisable2
+                  #       ,downloadButton("downloadResidual" , label="Download Final Residuals")
+                  #       ,verbatimTextOutput("linearCovariates")
+                  #       ,plotOutput("residualsPlot", height="800px") )
+                  )
                 , tabPanel("Protocol" , fluidPage(
                       p(h3(span("Current Trait" , style = "color:blue")))
                       ,tableOutput("protocolFile")
