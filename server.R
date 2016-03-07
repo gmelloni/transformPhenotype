@@ -455,7 +455,7 @@ output$sexplot <- renderUI({
   }
 })
 
-mytransform <- reactiveValues(transformer = NULL)
+# mytransform <- reactiveValues(transformer = NULL)
 ##### IN DEVELOPMENT
 output$transformer <- renderUI({
   if(is.null(rawData())){
@@ -469,66 +469,132 @@ output$transformer <- renderUI({
   traitUnit <- protocolFile()$units
   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
   transformMethod <- protocolFile()$transformation_method
-  # Initialize transformation side effect output
-  outputList <- list(paste(transformMethod , "further Normalization Info:"))
-  if(input$sexStratFlag=="Yes"){
-    females<-which(traitObject()$sex==2)
-    males<-which(traitObject()$sex==1)
-    loop <- c("Males" , "Females")
-  } else {
-    loop <- "No Stratification"
-  }
-  forPlotandTable <- lapply(loop , function(i){
-       subs <- if(i=="Males") {
-                  males 
-                } else if(i=="Females"){
-                  females
-                } else {
-                  1:length(traitObject()$trait)
-                }
-        x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
-        if(length(x)>1){
-          outputList <<- c(outputList , list(i) , list(x[-1]))
+  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+    # Initialize transformation side effect output
+    outputList <- list(paste(transformMethod , "further Normalization Info:"))
+    if(input$sexStratFlag=="Yes"){
+      females<-which(traitObject()$sex==2)
+      males<-which(traitObject()$sex==1)
+      loop <- c("Males" , "Females")
+    } else {
+      loop <- "No Stratification"
+    }
+    forPlotandTable <- lapply(loop , function(i){
+         subs <- if(i=="Males") {
+                    males 
+                  } else if(i=="Females"){
+                    females
+                  } else {
+                    1:length(traitObject()$trait)
+                  }
+          x <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)
+          if(length(x)>1){
+            outputList <<- c(outputList , list(i) , list(x[-1]))
+          } else {
+            outputList <<- c(outputList , list(i) , list("No other Info"))
+          }
+          x <- x$norm_data
+          return(x)
+    })
+    names(forPlotandTable) <- loop
+    # Store all the output of the transformation, I am sure is going to be useful
+    # mytransform$transformer <- forPlotandTable
+    # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
+    output$transformerplot <- renderPlot({
+      return({
+        if(input$sexStratFlag=="Yes"){
+          # loop <- c("Males" , "Females")
+          par(mfrow=c(4,2))
         } else {
-          outputList <<- c(outputList , list(i) , list("No other Info"))
+          # loop <- "No Stratification"
+          par(mfrow=c(2,2))
         }
-        x <- x$norm_data
-        return(x)
-  })
-  names(forPlotandTable) <- loop
-  # Store all the output of the transformation, I am sure is going to be useful
-  mytransform$transformer <- forPlotandTable
-  # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
-  output$transformersingleplot <- renderPlot({
+        for(i in loop){
+          normalizationPlot( x = forPlotandTable[[i]] , i = i , traitLabelFull = traitLabelFull)
+        }
+        })
+    })
+    # Display all the residual output from transformation (see box cox example)
+    output$normalizationSideEffect <- renderPrint({
+      if(is.null(traitObject())){
+        return(NULL)
+      }
+      return(outputList)
+    })
     return({
+      fluidPage(
+        plotOutput("transformerplot",height = "800px")
+        ,tags$hr()
+        ,verbatimTextOutput("normalizationSideEffect")
+      )
+    })
+  } else {
+    # Initialize transformation side effect output
+    tabs <- lapply(names(traitObject()) , function(strat){
+      outputList <- list(paste(transformMethod , "further Normalization Info:"))
       if(input$sexStratFlag=="Yes"){
+        females<-which(traitObject()[[strat]]$sex==2)
+        males<-which(traitObject()[[strat]]$sex==1)
         loop <- c("Males" , "Females")
-        par(mfrow=c(4,2))
       } else {
         loop <- "No Stratification"
-        par(mfrow=c(2,2))
       }
-      for(i in loop){
-        normalizationPlot( x = forPlotandTable[[i]] , i = i , traitLabelFull = traitLabelFull)
-      }
+      forPlotandTable <- lapply(loop , function(i){
+           subs <- if(i=="Males") {
+                      males 
+                    } else if(i=="Females"){
+                      females
+                    } else {
+                      1:length(traitObject()[[strat]]$trait)
+                    }
+            x <- normalizeTraitData(trait=traitObject()[[strat]]$trait[subs] , tm=transformMethod)
+            if(length(x)>1){
+              outputList <<- c(outputList , list(i) , list(x[-1]))
+            } else {
+              outputList <<- c(outputList , list(i) , list("No other Info"))
+            }
+            x <- x$norm_data
+            return(x)
       })
-  })
-  # Display all the residual output from transformation (see box cox example)
-  output$normalizationSideEffect <- renderPrint({
-    if(is.null(traitObject())){
-      return(NULL)
-    }
-    return(outputList)
-  })
-  return({
-    fluidPage(
-      plotOutput("transformersingleplot",height = "800px")
-      ,tags$hr()
-      ,verbatimTextOutput("normalizationSideEffect")
-    )
-  })
+      names(forPlotandTable) <- loop
+      # Store all the output of the transformation, I am sure is going to be useful
+      # mytransform$transformer <- forPlotandTable
+      # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
+      output[[paste0(strat , "_transformerplot")]] <- renderPlot({
+        return({
+          if(input$sexStratFlag=="Yes"){
+            # loop <- c("Males" , "Females")
+            par(mfrow=c(4,2))
+          } else {
+            # loop <- "No Stratification"
+            par(mfrow=c(2,2))
+          }
+          for(i in loop){
+            normalizationPlot( x = forPlotandTable[[i]] , i = i , traitLabelFull = traitLabelFull)
+          }
+          })
+      })
+      # Display all the residual output from transformation (see box cox example)
+      output[[paste0(strat , "_normalizationSideEffect")]] <- renderPrint({
+        if(is.null(traitObject())){
+          return(NULL)
+        }
+        return(outputList)
+      })
+      return({
+        tabPanel(strat , fluidPage(
+          plotOutput(paste0(strat , "_transformerplot"),height = "800px")
+          ,tags$hr()
+          ,verbatimTextOutput(paste0(strat , "_normalizationSideEffect"))
+        ))
+      })
+    })
+  return(do.call(tabsetPanel , tabs))
+  }
 })
 
+
+###################### OLD VERSION DEPRECATED START
 # Plot data according to normalization criterion
 # output$transformedplot <- renderPlot({
 #   if(is.null(rawData())){
@@ -640,6 +706,8 @@ output$transformer <- renderUI({
 #   }
 #   return(outputList)
 # })
+###################### OLD VERSION DEPRECATED END
+
 
 #-------------------------------#
 #   NORMALIZATION TEST TABLE    #
