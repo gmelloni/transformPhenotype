@@ -1,3 +1,54 @@
+# 4 frames plot with (from up to bottom, left to right)
+# Scatter plot with index
+# boxplot
+# histogram with density curve
+# normal qqplot
+normalizationPlot <- function(x , i , traitLabelFull){
+		# remove infinities
+		x <- x[ !is.infinite(x) ]
+        plot( x=1:length(x)
+            , y=x
+            , xlab="Index"
+            , ylab=traitLabelFull
+            , main=paste(i , "ScatterPlot" , paste("N =" , length(x)) , sep="\n")
+            , col=switch(i
+            			,"Males" = "navy"
+            			,"Females" = "red"
+            			,"black")
+			)
+        boxplot( x=x
+                , main=paste(i , "Boxplot" , sep="\n")
+                , col="cyan")
+        mymin=round(min(x),2)
+        mymax=round(max(x),2)
+        mymean=round(mean(x),2)
+        mysd=round(sqrt(var(x)),2)
+        mymain=sprintf("min=%s;max=%s;mean=%s;sd=%s",mymin,mymax,mymean,mysd)
+        hist( x=x
+            , main=paste(i , mymain , sep="\n")
+            , xlab=traitLabelFull
+            , prob=TRUE)
+        m <- mean(x, na.rm=TRUE)
+        std <- sd(x,na.rm=TRUE) 
+        curve(dnorm(x,mean=m,sd=std)
+            , add=T
+            , col="forestgreen"
+            , lwd=4)
+        #pv<-as.numeric(unlist(shapiro.test(x))[2])
+        pv <- tryCatch(as.numeric(unlist(ad.test(x))[2]) , error=function(e) "NA")
+        mymain=sprintf("Normal Q-Q plot (Anderson-Darling pval=%s)"
+          ,format(pv,digits=3,sci = T))
+        qqnorm(x
+              ,main=paste(i , mymain , sep="\n"))
+        qqline(x 
+              # ,col=if(i=="Males") "navy" else if(i=="Females") "red" else "black"
+              ,col = switch(i
+            			,"Males" = "navy"
+            			,"Females" = "red"
+            			,"black")
+              , lwd=4)
+}
+
 
 # Given a string like filt="<10,>20"
 # And a dataframe with ID and trait
