@@ -96,6 +96,7 @@ rawData <- reactive({
   if( all(c("genotype" , "phenotype") %in% colnames(out)) | all(c("genotype" , "phentoype") %in% colnames(out)) ){
     out$sample_id <- out$genotype
     out$phenotype <- NULL
+    out$phentoype <- NULL
     out$genotype <- NULL
   }
   # If sample_id is among the colnames it is going to be used as sample identifier
@@ -160,12 +161,10 @@ rawData <- reactive({
     ,"Age detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="age"))+1]
     ,"BMI detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="bmi"))+1]
     ,"Stratification Variables:" %++% numStrats
-                          # , sep="\n"
                           )
-  # dferror$myerror <- str(out)
-  # print(dferror$myerror)
   return(out)
 })
+
 # What was wrong with my data?
 # Error message about format is stored together with rawData() reactive object
 output$dferror <- renderPrint(cat(dferror$myerror , sep="\n"))
@@ -815,12 +814,10 @@ output$covariateAnalysis <- renderUI({
       loop <- list("No Stratification"=1:nrow(traitObject()))
     }
     normDataListForPlot <- lapply(loop , function(subs) {
-        # browser()
         normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
         signifCovs <- checkCovariates(covs=covList
                                     ,x=traitObject()[subs,]
                                     ,normx=normData
-                                    # ,sxf=sexStratFlag
                                     )
         if(!is.na(signifCovs[["signCov"]][1])){
           resList<-applySignifCovariates(signifCovs[["signCov"]],traitObject()[subs,],normData)
@@ -903,12 +900,10 @@ output$covariateAnalysis <- renderUI({
         loop <- list("No Stratification"=1:nrow(traitObject()[[strat]]))
       }
       normDataListForPlot <- lapply(loop , function(subs) {
-          # browser()
           normData <- normalizeTraitData(trait=traitObject()[[strat]]$trait[subs] , tm=transformMethod)$norm_data
           signifCovs <- checkCovariates(covs=covList
                                       ,x=traitObject()[[strat]][subs,]
                                       ,normx=normData
-                                      # ,sxf=sexStratFlag
                                       )
           if(!is.na(signifCovs[["signCov"]][1])){
             resList<-applySignifCovariates(signifCovs[["signCov"]],traitObject()[[strat]][subs,],normData)
@@ -984,24 +979,6 @@ observeEvent(!is.null(residual$df_res) , {
     session$sendCustomMessage("download_ready_res" , list(mex=""))
 })
 
-# Download residuals table
-# output$downloadResidual <- downloadHandler(
-#     filename=function() {
-#       timeTag <- Sys.time() %>% 
-#             sub(" GMT$" , "" , .) %>% 
-#             gsub(":" , "_" , .) %>%
-#             gsub("-" , "" , .) %>%
-#             sub(" " , "." , .)
-#       paste(protocolFile()$trait , "residuals" , timeTag , "stand_residuals.txt" , sep=".")
-#     }
-#     , content=function(file) {
-#         write.table(residual$df_res
-#                 , file=file
-#                 , sep = "\t"
-#                 , col.names = TRUE
-#                 , row.names = FALSE
-#                 , quote=FALSE)
-# })
 
 # This observer will wait for the store button to be pressed at least once
 # When this event is observed, the download button is enabled
@@ -1416,3 +1393,39 @@ session$onSessionEnded(function() {
 #                     ,normx=normData))
 #   }
 # })
+
+#-------------------#
+# DOWNLOAD RESIDUAL #
+#-------------------#
+# OLD AND DEPRECATED
+# Download residuals table
+# output$downloadResidual <- downloadHandler(
+#     filename=function() {
+#       timeTag <- Sys.time() %>% 
+#             sub(" GMT$" , "" , .) %>% 
+#             gsub(":" , "_" , .) %>%
+#             gsub("-" , "" , .) %>%
+#             sub(" " , "." , .)
+#       paste(protocolFile()$trait , "residuals" , timeTag , "stand_residuals.txt" , sep=".")
+#     }
+#     , content=function(file) {
+#         write.table(residual$df_res
+#                 , file=file
+#                 , sep = "\t"
+#                 , col.names = TRUE
+#                 , row.names = FALSE
+#                 , quote=FALSE)
+# })
+
+
+# SOME ATTEMPTS TO A BETTER AESTHETIC
+#    ,tags$head(
+#   tags$style(type="text/css", "label.radio { display: inline-block; }", ".radio input[type=\"radio\"] { float: none; }"),
+#   tags$style(type="text/css", "select { max-width: 200px; }"),
+#   tags$style(type="text/css", "textarea { max-width: 4000px; }"),
+#   tags$style(type="text/css", ".jslider { max-width: 200px; }"),
+#   tags$style(type='text/css', ".well { padding: 12px; margin-bottom: 5px; max-width: 280px; }"),
+#   tags$style(type='text/css', ".span4 { max-width: 10px; }"),
+#   tags$style(type='text/css', ".span8 { max-width: 4000px; min-width: 4000px;}")
+# )
+# tags$head(HTML('<style>.span2 {min-width: 265px; max-width: 265px; }</style>'))

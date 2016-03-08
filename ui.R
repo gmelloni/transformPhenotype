@@ -16,20 +16,6 @@ tagfordisable <- singleton(tags$head(HTML(
   </script>
 '
 )))
-# tagfordisable2 <- singleton(tags$head(HTML(
-# '
-#   <script type="text/javascript">
-#     $(document).ready(function() {
-#       // disable download at startup. downloadResidual is the id of the downloadButton
-#       $("#downloadResidual").attr("disabled", "true").attr("onclick", "return false;");
-#       Shiny.addCustomMessageHandler("download_ready_res", function(message) {
-#         $("#downloadResidual").removeAttr("disabled").removeAttr("onclick").html(
-#           "<i class=\\"fa fa-download\\"></i> Download of residual table file is ready" + message.mex);
-#       });
-#     })
-#   </script>
-# '
-# )))
 
 shinyUI(
   dashboardPage(skin="purple"
@@ -57,23 +43,11 @@ shinyUI(
       ,tabItems(
         tabItem("analysispan" , 
           fluidPage(
-            tagfordisable
-         #    ,tags$head(
-          #   tags$style(type="text/css", "label.radio { display: inline-block; }", ".radio input[type=\"radio\"] { float: none; }"),
-          #   tags$style(type="text/css", "select { max-width: 200px; }"),
-          #   tags$style(type="text/css", "textarea { max-width: 4000px; }"),
-          #   tags$style(type="text/css", ".jslider { max-width: 200px; }"),
-          #   tags$style(type='text/css', ".well { padding: 12px; margin-bottom: 5px; max-width: 280px; }"),
-          #   tags$style(type='text/css', ".span4 { max-width: 10px; }"),
-          #   tags$style(type='text/css', ".span8 { max-width: 4000px; min-width: 4000px;}")
-            # )
-            # , conditionalDisabledPanel(element="goDDButton" , tagmessage="go_with_the_analysis") 
+            tagfordisable 
             ,sidebarLayout(
               sidebarPanel(
-              # tags$head(HTML('<style>.span2 {min-width: 265px; max-width: 265px; }</style>'))
               fileInput('myfile'
-                ,'Choose a tab delimited file'
-                # , accept=c('text/comma-separated-values' , 'text/plain') 
+                ,'Choose a tab delimited file' 
                 , multiple=TRUE)
               ,actionButton("example" , "Load Example Dataset")
               ,helpText("Transform Phenotype accepts a tab-delimited file with header")
@@ -86,10 +60,8 @@ shinyUI(
                 ,selected=""
               )
               ,textInput("units", label = "Input Unit of measurement", value = "nmol/l")
-              # ,tags$hr()
               ,selectInput("transformation_method", 
                 "Choose a function for the transformation:", 
-                # ,choices=c("untransformed","box_cox","inverse_normal","log","square")
                 ,choices=names(normalizationFunctionsList)
                 ,multiple=FALSE
                 ,selected="untransformed")
@@ -130,35 +102,11 @@ shinyUI(
                 type = "tabs"
                 ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")
                                           , verbatimTextOutput("dferror")
-                                          ))
-                # , tabPanel("Protocol" , fluidPage(tableOutput("protocolFile")))
-                , tabPanel("Gender Difference" , fluidPage(
-                    # plotOutput("sexplot",height = "800px")
-                    uiOutput("sexplot")
-                    )
-                  )
-                , tabPanel("Transform Plot" 
-                    ,uiOutput("transformer")
-                  # , fluidPage(
-                  #       plotOutput("transformedplot",height = "800px")
-                  #       ,tags$hr()
-                  #       ,verbatimTextOutput("normalizationSideEffect")
-                  #   )
-                  )
-                , tabPanel("Normality Summary" , fluidPage(
-                    uiOutput("normalTable")
-                    # DT::dataTableOutput("normalTable")
-                    # ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)") 
-                    )
-                  )
-                # , tabPanel("FilterData" , fluidPage(tableOutput("traitObject2")))
-                , tabPanel("Covariate Analysis" , uiOutput("covariateAnalysis")
-                  # , fluidPage(
-                  #       tagfordisable2
-                  #       ,downloadButton("downloadResidual" , label="Download Final Residuals")
-                  #       ,verbatimTextOutput("linearCovariates")
-                  #       ,plotOutput("residualsPlot", height="800px") )
-                  )
+                                          )))
+                , tabPanel("Gender Difference" , fluidPage(uiOutput("sexplot")))
+                , tabPanel("Transform Plot" , uiOutput("transformer"))
+                , tabPanel("Normality Summary" , fluidPage(uiOutput("normalTable")))
+                , tabPanel("Covariate Analysis" , uiOutput("covariateAnalysis"))
                 , tabPanel("Protocol" , fluidPage(
                       p(h3(span("Current Trait" , style = "color:blue")))
                       ,tableOutput("protocolFile")
@@ -168,7 +116,6 @@ shinyUI(
                       ,helpText("Download will be available after first click to Store this transformation.")             
                       ,DT::dataTableOutput("cumulativeProtocolFile")
                       ))
-                # , tabPanel("Residual Table" , fluidPage(tableOutput("residualTable")))
               )
             )
           ))
@@ -200,3 +147,25 @@ shinyUI(
     )
   )
 )
+
+
+
+#---------------#
+# CODE CEMETERY #
+#---------------#
+
+# tagfordisable2 <- singleton(tags$head(HTML(
+# '
+#   <script type="text/javascript">
+#     $(document).ready(function() {
+#       // disable download at startup. downloadResidual is the id of the downloadButton
+#       $("#downloadResidual").attr("disabled", "true").attr("onclick", "return false;");
+#       Shiny.addCustomMessageHandler("download_ready_res", function(message) {
+#         $("#downloadResidual").removeAttr("disabled").removeAttr("onclick").html(
+#           "<i class=\\"fa fa-download\\"></i> Download of residual table file is ready" + message.mex);
+#       });
+#     })
+#   </script>
+# '
+# )))
+
