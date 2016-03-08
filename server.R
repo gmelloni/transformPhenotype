@@ -28,7 +28,9 @@ output$myImage <- renderImage({
 #---------------------#
 
 # Create a reactive value for error
-dferror <- reactiveValues(myerror=NULL)
+dferror <- reactiveValues(myerror=c("Welcome to the Transform Phenotype App!"
+                                    ,"If you don't have your own dataset or you are not sure about the format"
+                                    ,"Click on Load Example Dataset ;)"))
 
 # Reactive object with the full dataset
 # This object is activated when you upload some data
