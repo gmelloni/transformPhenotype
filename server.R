@@ -37,18 +37,54 @@ rawData <- reactive({
   if(!is.null(input$myfile)){
     inFile <- input$myfile
   } else if(as.logical(input$example)){
-    inFile <- list(name="exampleDataset.txt" 
-      , datapath=file.path("data" , "exampleDataset.txt"))
+    inFile <- data.frame(name="exampleDataset.txt" 
+      , datapath=file.path("data" , "exampleDataset.txt")
+      ,stringsAsFactors=FALSE)
   } else {
     return(NULL)
   }
-  out <- read.table(inFile$datapath
-            , header=TRUE
-            , sep="\t"
-            , fill=TRUE
-            , strip.white=TRUE
-            , as.is=TRUE
-            )
+  print(str(inFile))
+  if(nrow(inFile)==1){
+    out <- read.table(inFile$datapath
+              , header=TRUE
+              , sep="\t"
+              , fill=TRUE
+              , strip.white=TRUE
+              , as.is=TRUE
+              )
+  } else {
+    checkCols <- sapply(inFile$datapath , function(x) readLines(x , n=1))
+    if(any(checkCols!=checkCols[1])){
+      dferror$myerror <- "You select multiple files with different column names"
+      return(NULL)
+    }
+    fileNames <- if(any(duplicated(inFile$name))){
+                  paste("Cohort" , 1:nrow(inFile) , sep=".")
+                 } else {
+                  inFile$name
+                }
+    out <- lapply(1:length(inFile$datapath) , function(x) {
+            outInternal <- read.table(inFile$datapath[[x]]
+              , header=TRUE
+              , sep="\t"
+              , fill=TRUE
+              , strip.white=TRUE
+              , as.is=TRUE
+              )
+            if(nrow(outInternal)==0)
+              return(NULL)
+            if("InputFileNum" %notin% colnames(outInternal)){
+              outInternal$InputFileNum <- fileNames[x]
+            } else {
+              return(NULL)
+            }
+            return(outInternal)
+            }) %>% do.call("rbind" , .)
+    if(is.null(out)){
+      dferror$myerror <- "Either all files are empty or InputFileNum is among the column names"
+      return(NULL)
+    }
+  }
   colnames(out) <- tolower(colnames(out))
   rawRows <- nrow(out)
   out <- unique(out)
@@ -56,7 +92,7 @@ rawData <- reactive({
     warning("FOUND DUPLICATED ROWS. REMOVED")
   #### Check for Sanger Phenotype Database format
     # There is currently a typo in the database (phentoype instead of phenotype)
-    # We accept bothe forms
+    # We accept both forms
   if( all(c("genotype" , "phenotype") %in% colnames(out)) | all(c("genotype" , "phentoype") %in% colnames(out)) ){
     out$sample_id <- out$genotype
     out$phenotype <- NULL
@@ -122,6 +158,7 @@ rawData <- reactive({
     ,"Numeric Traits (excluding sex and age):" %++% numTraits
     ,"Sex detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="sex"))+1]
     ,"Age detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="age"))+1]
+    ,"BMI detected:" %++% c("No" , "Yes")[as.numeric(any(colnames(out)=="bmi"))+1]
     ,"Stratification Variables:" %++% numStrats
                           # , sep="\n"
                           )
@@ -664,7 +701,7 @@ output$normalTable <- renderUI({
                   , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow')))
               })
     return({
-      tagList(DT::dataTableOutput("singleNormalTable")
+      fluidPage(DT::dataTableOutput("singleNormalTable")
               ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)")
               ,helpText("Empty cells means that the test could not be evaluated")) 
               })
@@ -759,231 +796,186 @@ output$covariateAnalysis <- renderUI({
   cvr <- unlist(strsplit(covariates , ","))
   covList<- list(covariates=cvr
               , age2Flag=if("age2" %in% cvr) TRUE else NA)
-  if(input$sexStratFlag=="Yes"){
-    cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
-    if(length(cvr)==0){
-      mymex <- "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
-      output$covariateAnalysisEmpty <- emptyPlotter(mymex)
-      return(
-        plotOutput("covariateAnalysisEmpty" , height="800px")
-      )
-    }
-    covList<- list(covariates=cvr
-              , age2Flag=if("age2" %in% cvr) TRUE else NA)
-    females<-which(traitObject()$sex==2)
-    males<-which(traitObject()$sex==1)
-    loop <- list("Males"=males , "Females"=females)
-  } else {
-    loop <- list("No Stratification"=1:nrow(traitObject()))
-  }
-  normDataListForPlot <- lapply(loop , function(subs) {
-      # browser()
-      normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-      signifCovs <- checkCovariates(covs=covList
-                                  ,x=traitObject()[subs,]
-                                  ,normx=normData
-                                  # ,sxf=sexStratFlag
-                                  )
-      if(!is.na(signifCovs[["signCov"]][1])){
-        resList<-applySignifCovariates(signifCovs[["signCov"]],traitObject()[subs,],normData)
-        normResiduals<-resList$residuals
-        covString <- resList$covStr
-        retData <- checkResiduals(normResiduals,traitObject()[subs,])
-        outputData <- retData$outputData
-        normResiduals <- retData$normResiduals
-      } else {
-        normResiduals <- normData
-        covString <- NULL
-        retData <- checkResiduals(normResiduals,traitObject()[subs,])
-        outputData <- retData$outputData
-        normResiduals <- retData$normResiduals
+  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+    if(input$sexStratFlag=="Yes"){
+      cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
+      if(length(cvr)==0){
+        mymex <- "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
+        output$covariateAnalysisEmpty <- emptyPlotter(mymex)
+        return(
+          plotOutput("covariateAnalysisEmpty" , height="800px")
+        )
       }
-      return(list(signifCovs=signifCovs 
-                , covString=covString 
-                , normResiduals=normResiduals 
-                , normData=normData 
-                , outputData=outputData))
+      covList<- list(covariates=cvr
+                , age2Flag=if("age2" %in% cvr) TRUE else NA)
+      females<-which(traitObject()$sex==2)
+      males<-which(traitObject()$sex==1)
+      loop <- list("Males"=males , "Females"=females)
+    } else {
+      loop <- list("No Stratification"=1:nrow(traitObject()))
+    }
+    normDataListForPlot <- lapply(loop , function(subs) {
+        # browser()
+        normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+        signifCovs <- checkCovariates(covs=covList
+                                    ,x=traitObject()[subs,]
+                                    ,normx=normData
+                                    # ,sxf=sexStratFlag
+                                    )
+        if(!is.na(signifCovs[["signCov"]][1])){
+          resList<-applySignifCovariates(signifCovs[["signCov"]],traitObject()[subs,],normData)
+          normResiduals<-resList$residuals
+          covString <- resList$covStr
+          retData <- checkResiduals(normResiduals,traitObject()[subs,])
+          outputData <- retData$outputData
+          normResiduals <- retData$normResiduals
+        } else {
+          normResiduals <- normData
+          covString <- NULL
+          retData <- checkResiduals(normResiduals,traitObject()[subs,])
+          outputData <- retData$outputData
+          normResiduals <- retData$normResiduals
+        }
+        return(list(signifCovs=signifCovs 
+                  , covString=covString 
+                  , normResiduals=normResiduals 
+                  , normData=normData 
+                  , outputData=outputData))
+        })
+          # First checkpoint, show the summary of the linear model
+      output$linearCovariates <- renderPrint(
+        invisible(sapply(names(normDataListForPlot) , function(x) {
+                      return(cat(toupper(x) , show(normDataListForPlot[[x]][["signifCovs"]][["summary"]]) , sep="\n"))
+                    }))
+        )
+      # Add a side effect for this function, by reporting the actual residual table
+      outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
+      observe({
+        residual$df_res <- outputData
       })
-        # First checkpoint, show the summary of the linear model
-    output$linearCovariates <- renderPrint(
-      invisible(sapply(names(normDataListForPlot) , function(x) {
-                    return(cat(toupper(x) , show(normDataListForPlot[[x]][["signifCovs"]][["summary"]]) , sep="\n"))
-                  }))
+      output$residualsPlot <- renderPlot(
+        plotResidual2(
+                      tl=currTrait
+                      ,tlf=traitLabelFull
+                      ,myList=normDataListForPlot
+                      ,sexStratFlag=input$sexStratFlag
+                      )
       )
-    # Add a side effect for this function, by reporting the actual residual table
-    outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
-    observe({
-      residual$df_res <- outputData
-    })
-    output$residualsPlot <- renderPlot(
-      plotResidual2(
-                    tl=currTrait
-                    ,tlf=traitLabelFull
-                    ,myList=normDataListForPlot
-                    ,sexStratFlag=input$sexStratFlag
-                    )
+      output$downloadResidual <- downloadHandler(
+        filename=function() {
+          timeTag <- Sys.time() %>% 
+                sub(" GMT$" , "" , .) %>% 
+                gsub(":" , "_" , .) %>%
+                gsub("-" , "" , .) %>%
+                sub(" " , "." , .)
+          paste(protocolFile()$trait , "residuals" , timeTag , "stand_residuals.txt" , sep=".")
+        }
+        , content=function(file) {
+            write.table(residual$df_res
+                    , file=file
+                    , sep = "\t"
+                    , col.names = TRUE
+                    , row.names = FALSE
+                    , quote=FALSE)
+      })
+    return(fluidPage(
+            downloadButton("downloadResidual" , label="Download Final Residuals")
+            ,verbatimTextOutput("linearCovariates")
+            ,plotOutput("residualsPlot", height="800px") )
     )
-  return(fluidPage(
-          # tagfordisable2
-          downloadButton("downloadResidual" , label="Download Final Residuals")
-          ,verbatimTextOutput("linearCovariates")
-          ,plotOutput("residualsPlot", height="800px") )
-  ) 
+  } else {
+    tabs <- lapply(names(traitObject()) , function(strat) {
+      if(input$sexStratFlag=="Yes"){
+        cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
+        if(length(cvr)==0){
+          mymex <- "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
+          output$covariateAnalysisEmpty <- emptyPlotter(mymex)
+          return(
+            plotOutput("covariateAnalysisEmpty" , height="800px")
+          )
+        }
+        covList<- list(covariates=cvr
+                  , age2Flag=if("age2" %in% cvr) TRUE else NA)
+        females<-which(traitObject()[[strat]]$sex==2)
+        males<-which(traitObject()[[strat]]$sex==1)
+        loop <- list("Males"=males , "Females"=females)
+      } else {
+        loop <- list("No Stratification"=1:nrow(traitObject()[[strat]]))
+      }
+      normDataListForPlot <- lapply(loop , function(subs) {
+          # browser()
+          normData <- normalizeTraitData(trait=traitObject()[[strat]]$trait[subs] , tm=transformMethod)$norm_data
+          signifCovs <- checkCovariates(covs=covList
+                                      ,x=traitObject()[[strat]][subs,]
+                                      ,normx=normData
+                                      # ,sxf=sexStratFlag
+                                      )
+          if(!is.na(signifCovs[["signCov"]][1])){
+            resList<-applySignifCovariates(signifCovs[["signCov"]],traitObject()[[strat]][subs,],normData)
+            normResiduals<-resList$residuals
+            covString <- resList$covStr
+            retData <- checkResiduals(normResiduals,traitObject()[[strat]][subs,])
+            outputData <- retData$outputData
+            normResiduals <- retData$normResiduals
+          } else {
+            normResiduals <- normData
+            covString <- NULL
+            retData <- checkResiduals(normResiduals,traitObject()[[strat]][subs,])
+            outputData <- retData$outputData
+            normResiduals <- retData$normResiduals
+          }
+          return(list(signifCovs=signifCovs 
+                    , covString=covString 
+                    , normResiduals=normResiduals 
+                    , normData=normData 
+                    , outputData=outputData))
+          })
+            # First checkpoint, show the summary of the linear model
+        output[[paste0(strat , "_linearCovariates")]] <- renderPrint(
+          invisible(sapply(names(normDataListForPlot) , function(x) {
+                        return(cat(toupper(x) , show(normDataListForPlot[[x]][["signifCovs"]][["summary"]]) , sep="\n"))
+                      }))
+          )
+        # Add a side effect for this function, by reporting the actual residual table
+        outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
+        observe({
+          residual[[paste0(strat , "_df_res")]] <- outputData
+        })
+        output[[paste0(strat , "_residualsPlot")]] <- renderPlot(
+          plotResidual2(
+                        tl=currTrait
+                        ,tlf=traitLabelFull
+                        ,myList=normDataListForPlot
+                        ,sexStratFlag=input$sexStratFlag
+                        )
+        )
+        output[[paste0(strat , "_downloadResiduals")]] <- downloadHandler(
+          filename=function() {
+            timeTag <- Sys.time() %>% 
+                  sub(" GMT$" , "" , .) %>% 
+                  gsub(":" , "_" , .) %>%
+                  gsub("-" , "" , .) %>%
+                  sub(" " , "." , .)
+            paste(protocolFile()$trait , "residuals" , strat , timeTag , "stand_residuals.txt" , sep=".")
+          }
+          , content=function(file) {
+              write.table(residual[[paste0(strat , "_df_res")]]
+                      , file=file
+                      , sep = "\t"
+                      , col.names = TRUE
+                      , row.names = FALSE
+                      , quote=FALSE)
+        })
+      return(tabPanel(
+              strat
+              ,downloadButton(paste0(strat , "_downloadResiduals") , label="Download Final Residuals")
+              ,verbatimTextOutput(paste0(strat , "_linearCovariates"))
+              ,plotOutput(paste0(strat , "_residualsPlot"), height="800px") )
+      )
+    })
+    do.call(tabsetPanel , tabs)
+  }
 })
-
-# Linear Model on covariates results
-# output$linearCovariates <- renderPrint({
-#   if(is.null(rawData())){
-#     return(NULL)
-#   }
-#   covariates <- protocolFile()$covariates_tested
-#   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
-#   if(is.na(covariates)){
-#     return(NULL)
-#   }
-#   currTrait <- protocolFile()$trait
-#   traitUnit <- protocolFile()$units
-#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
-#   transformMethod <- protocolFile()$transformation_method
-#   cvr <- unlist(strsplit(covariates , ","))
-#   covList<- list(covariates=cvr
-#               , age2Flag=if("age2" %in% cvr) TRUE else NA)
-#   if(input$sexStratFlag=="Yes"){
-#     females<-which(traitObject()$sex==2)
-#     males<-which(traitObject()$sex==1)
-#     loop <- c("Males" , "Females")
-#     normData <- lapply(list("Males"=males , "Females"=females) , function(subs) {
-#         normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-#         signifCovs<-checkCovariates2(covs=covList
-#                                 ,x=traitObject()[subs , ]
-#                                 ,normx=normData)
-#       })
-#     return(invisible(sapply(names(normData) , function(x) {
-#         return(cat(toupper(x) , show(normData[[x]]) , sep="\n"))
-#         }))
-#     )
-#   } else {
-#     # subs <- 1:nrow(traitObject())
-#     normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
-#     signifCovs <- checkCovariates2(covs=covList
-#                                 ,x=traitObject()
-#                                 ,normx=normData)
-#     return(show(signifCovs))
-#   }
-# })
-
-# This object is the residual table
-# It is updated every time the residualPlot changes
-# residual <- reactiveValues(df_res=NULL)
-# Normalize data and check for residual of the covariates
-# output$residualsPlot <- renderPlot({
-#   if(is.null(rawData())){
-#     return({
-#       par(mar = c(0,0,0,0))
-#       plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-#       text(x = 0.5, y = 0.5, "No data yet"
-#         ,cex = 3, col = "black")
-#     })
-#   }
-#   covariates <- protocolFile()$covariates_tested
-#   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
-#   if(is.na(covariates)){
-#     return({
-#       par(mar = c(0,0,0,0))
-#       plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-#       text(x = 0.5, y = 0.5, "No covariates selected"
-#         ,cex = 3, col = "black")
-#     })
-#   }
-#   currTrait <- protocolFile()$trait
-#   traitUnit <- protocolFile()$units
-#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
-#   transformMethod <- protocolFile()$transformation_method
-#   if(input$sexStratFlag=="Yes"){
-#     cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
-#     if(length(cvr)==0){
-#       return({
-#         par(mar = c(0,0,0,0))
-#         plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-#         text(x = 0.5, y = 0.5, "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
-#           ,cex = 3, col = "black")
-#       })
-#     }
-#     covList<- list(covariates=cvr
-#              , age2Flag=if("age2" %in% cvr) TRUE else NA)
-#     females<-which(traitObject()$sex==2)
-#     males<-which(traitObject()$sex==1)
-#     loop <- list("Males"=males , "Females"=females)
-#     # loop <- c("Males" , "Females")
-#     normDataListForPlot <- lapply(loop , function(subs) {
-#       normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-#       signifCovs<-checkCovariates(covs=covList
-#                                   ,x=traitObject()[subs,]
-#                                   ,normx=normData
-#                                   ,sxf=sexStratFlag)
-#       if(!is.na(signifCovs[1])){
-#         resList<-applySignifCovariates(signifCovs,traitObject()[subs,],normData)
-#         normResiduals<-resList$residuals
-#         covString <- resList$covStr
-#         retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
-#         outputData <- retData$outputData
-#         normResiduals <- retData$normResiduals
-#       } else {
-#         normResiduals <- normData
-#         covString <- NULL
-#         retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
-#         outputData <- retData$outputData
-#         normResiduals <- retData$normResiduals
-#       }
-#       return(list(covString=covString , normResiduals=normResiduals , normData=normData , outputData=outputData))
-#       })
-#     # Add a side effect for this function, by reporting the actual residual table
-#     outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
-#     observe({
-#       residual$df_res <- outputData
-#     })
-#     return(plotResidualDataBySex(
-#                     tl=currTrait
-#                     ,tlf=traitLabelFull
-#                     ,myList=normDataListForPlot
-#                     ))
-#   } else {
-#     # subs <- 1:nrow(traitObject())
-#     # normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
-#     normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
-#     cvr <- unlist(strsplit(covariates , ","))
-#     covList<- list(covariates=cvr
-#               , age2Flag=if("age2" %in% cvr) TRUE else NA)
-#     signifCovs<-checkCovariates(covs=covList
-#                                 ,x=traitObject()
-#                                 ,normx=normData
-#                                 ,sxf=sexStratFlag)
-#     if(!is.na(signifCovs[1])){
-#       resList<-applySignifCovariates(signifCovs,traitObject(),normData)
-#       normResiduals<-resList$residuals
-#       covString <- resList$covStr
-#       retData <- checkResiduals(normResiduals,traitObject(),"")
-#       outputData <- retData$outputData
-#       normResiduals <- retData$normResiduals
-#     } else {
-#       normResiduals <- normData
-#       covString <- NULL
-#       retData <- checkResiduals(normResiduals,traitObject(),"")
-#       outputData <- retData$outputData
-#       normResiduals <- retData$normResiduals
-#     }
-#     # Side effect, update residual final table
-#     observe({
-#       residual$df_res <- outputData
-#     })
-#     return(plotResidualData(tl=currTrait
-#                     ,tlf=traitLabelFull
-#                     # ,"No Stratification"
-#                     ,cvs=covString
-#                     ,res=normResiduals
-#                     ,normx=normData))
-#   }
-# })
 
 # This observer will wait for the residual table to be present
 # When this event is observed, the download button is enabled
@@ -993,23 +985,23 @@ observeEvent(!is.null(residual$df_res) , {
 })
 
 # Download residuals table
-output$downloadResidual <- downloadHandler(
-    filename=function() {
-      timeTag <- Sys.time() %>% 
-            sub(" GMT$" , "" , .) %>% 
-            gsub(":" , "_" , .) %>%
-            gsub("-" , "" , .) %>%
-            sub(" " , "." , .)
-      paste(protocolFile()$trait , "residuals" , timeTag , "stand_residuals.txt" , sep=".")
-    }
-    , content=function(file) {
-        write.table(residual$df_res
-                , file=file
-                , sep = "\t"
-                , col.names = TRUE
-                , row.names = FALSE
-                , quote=FALSE)
-})
+# output$downloadResidual <- downloadHandler(
+#     filename=function() {
+#       timeTag <- Sys.time() %>% 
+#             sub(" GMT$" , "" , .) %>% 
+#             gsub(":" , "_" , .) %>%
+#             gsub("-" , "" , .) %>%
+#             sub(" " , "." , .)
+#       paste(protocolFile()$trait , "residuals" , timeTag , "stand_residuals.txt" , sep=".")
+#     }
+#     , content=function(file) {
+#         write.table(residual$df_res
+#                 , file=file
+#                 , sep = "\t"
+#                 , col.names = TRUE
+#                 , row.names = FALSE
+#                 , quote=FALSE)
+# })
 
 # This observer will wait for the store button to be pressed at least once
 # When this event is observed, the download button is enabled
@@ -1266,3 +1258,161 @@ session$onSessionEnded(function() {
 #   return(outputList)
 # })
 ###################### OLD VERSION DEPRECATED END
+
+#--------------------#
+# COVARIATE ANALYSIS #
+#--------------------#
+
+# Linear Model on covariates results
+# output$linearCovariates <- renderPrint({
+#   if(is.null(rawData())){
+#     return(NULL)
+#   }
+#   covariates <- protocolFile()$covariates_tested
+#   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
+#   if(is.na(covariates)){
+#     return(NULL)
+#   }
+#   currTrait <- protocolFile()$trait
+#   traitUnit <- protocolFile()$units
+#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+#   transformMethod <- protocolFile()$transformation_method
+#   cvr <- unlist(strsplit(covariates , ","))
+#   covList<- list(covariates=cvr
+#               , age2Flag=if("age2" %in% cvr) TRUE else NA)
+#   if(input$sexStratFlag=="Yes"){
+#     females<-which(traitObject()$sex==2)
+#     males<-which(traitObject()$sex==1)
+#     loop <- c("Males" , "Females")
+#     normData <- lapply(list("Males"=males , "Females"=females) , function(subs) {
+#         normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#         signifCovs<-checkCovariates2(covs=covList
+#                                 ,x=traitObject()[subs , ]
+#                                 ,normx=normData)
+#       })
+#     return(invisible(sapply(names(normData) , function(x) {
+#         return(cat(toupper(x) , show(normData[[x]]) , sep="\n"))
+#         }))
+#     )
+#   } else {
+#     # subs <- 1:nrow(traitObject())
+#     normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
+#     signifCovs <- checkCovariates2(covs=covList
+#                                 ,x=traitObject()
+#                                 ,normx=normData)
+#     return(show(signifCovs))
+#   }
+# })
+
+# This object is the residual table
+# It is updated every time the residualPlot changes
+# residual <- reactiveValues(df_res=NULL)
+# Normalize data and check for residual of the covariates
+# output$residualsPlot <- renderPlot({
+#   if(is.null(rawData())){
+#     return({
+#       par(mar = c(0,0,0,0))
+#       plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       text(x = 0.5, y = 0.5, "No data yet"
+#         ,cex = 3, col = "black")
+#     })
+#   }
+#   covariates <- protocolFile()$covariates_tested
+#   covariates <- if(is.na(covariates) | covariates=="") NA else covariates
+#   if(is.na(covariates)){
+#     return({
+#       par(mar = c(0,0,0,0))
+#       plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#       text(x = 0.5, y = 0.5, "No covariates selected"
+#         ,cex = 3, col = "black")
+#     })
+#   }
+#   currTrait <- protocolFile()$trait
+#   traitUnit <- protocolFile()$units
+#   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
+#   transformMethod <- protocolFile()$transformation_method
+#   if(input$sexStratFlag=="Yes"){
+#     cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
+#     if(length(cvr)==0){
+#       return({
+#         par(mar = c(0,0,0,0))
+#         plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+#         text(x = 0.5, y = 0.5, "If you stratify by sex, you can't have sex...\n\n... as the only covariate :)"
+#           ,cex = 3, col = "black")
+#       })
+#     }
+#     covList<- list(covariates=cvr
+#              , age2Flag=if("age2" %in% cvr) TRUE else NA)
+#     females<-which(traitObject()$sex==2)
+#     males<-which(traitObject()$sex==1)
+#     loop <- list("Males"=males , "Females"=females)
+#     # loop <- c("Males" , "Females")
+#     normDataListForPlot <- lapply(loop , function(subs) {
+#       normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#       signifCovs<-checkCovariates(covs=covList
+#                                   ,x=traitObject()[subs,]
+#                                   ,normx=normData
+#                                   ,sxf=sexStratFlag)
+#       if(!is.na(signifCovs[1])){
+#         resList<-applySignifCovariates(signifCovs,traitObject()[subs,],normData)
+#         normResiduals<-resList$residuals
+#         covString <- resList$covStr
+#         retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
+#         outputData <- retData$outputData
+#         normResiduals <- retData$normResiduals
+#       } else {
+#         normResiduals <- normData
+#         covString <- NULL
+#         retData <- checkResiduals(normResiduals,traitObject()[subs,],"")
+#         outputData <- retData$outputData
+#         normResiduals <- retData$normResiduals
+#       }
+#       return(list(covString=covString , normResiduals=normResiduals , normData=normData , outputData=outputData))
+#       })
+#     # Add a side effect for this function, by reporting the actual residual table
+#     outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
+#     observe({
+#       residual$df_res <- outputData
+#     })
+#     return(plotResidualDataBySex(
+#                     tl=currTrait
+#                     ,tlf=traitLabelFull
+#                     ,myList=normDataListForPlot
+#                     ))
+#   } else {
+#     # subs <- 1:nrow(traitObject())
+#     # normData <- normalizeTraitData(trait=traitObject()$trait[subs] , tm=transformMethod)$norm_data
+#     normData <- normalizeTraitData(trait=traitObject()$trait , tm=transformMethod)$norm_data
+#     cvr <- unlist(strsplit(covariates , ","))
+#     covList<- list(covariates=cvr
+#               , age2Flag=if("age2" %in% cvr) TRUE else NA)
+#     signifCovs<-checkCovariates(covs=covList
+#                                 ,x=traitObject()
+#                                 ,normx=normData
+#                                 ,sxf=sexStratFlag)
+#     if(!is.na(signifCovs[1])){
+#       resList<-applySignifCovariates(signifCovs,traitObject(),normData)
+#       normResiduals<-resList$residuals
+#       covString <- resList$covStr
+#       retData <- checkResiduals(normResiduals,traitObject(),"")
+#       outputData <- retData$outputData
+#       normResiduals <- retData$normResiduals
+#     } else {
+#       normResiduals <- normData
+#       covString <- NULL
+#       retData <- checkResiduals(normResiduals,traitObject(),"")
+#       outputData <- retData$outputData
+#       normResiduals <- retData$normResiduals
+#     }
+#     # Side effect, update residual final table
+#     observe({
+#       residual$df_res <- outputData
+#     })
+#     return(plotResidualData(tl=currTrait
+#                     ,tlf=traitLabelFull
+#                     # ,"No Stratification"
+#                     ,cvs=covString
+#                     ,res=normResiduals
+#                     ,normx=normData))
+#   }
+# })

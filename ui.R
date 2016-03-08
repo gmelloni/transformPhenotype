@@ -16,20 +16,20 @@ tagfordisable <- singleton(tags$head(HTML(
   </script>
 '
 )))
-tagfordisable2 <- singleton(tags$head(HTML(
-'
-  <script type="text/javascript">
-    $(document).ready(function() {
-      // disable download at startup. downloadResidual is the id of the downloadButton
-      $("#downloadResidual").attr("disabled", "true").attr("onclick", "return false;");
-      Shiny.addCustomMessageHandler("download_ready_res", function(message) {
-        $("#downloadResidual").removeAttr("disabled").removeAttr("onclick").html(
-          "<i class=\\"fa fa-download\\"></i> Download of residual table file is ready" + message.mex);
-      });
-    })
-  </script>
-'
-)))
+# tagfordisable2 <- singleton(tags$head(HTML(
+# '
+#   <script type="text/javascript">
+#     $(document).ready(function() {
+#       // disable download at startup. downloadResidual is the id of the downloadButton
+#       $("#downloadResidual").attr("disabled", "true").attr("onclick", "return false;");
+#       Shiny.addCustomMessageHandler("download_ready_res", function(message) {
+#         $("#downloadResidual").removeAttr("disabled").removeAttr("onclick").html(
+#           "<i class=\\"fa fa-download\\"></i> Download of residual table file is ready" + message.mex);
+#       });
+#     })
+#   </script>
+# '
+# )))
 
 shinyUI(
   dashboardPage(skin="purple"
@@ -71,8 +71,10 @@ shinyUI(
             ,sidebarLayout(
               sidebarPanel(
               # tags$head(HTML('<style>.span2 {min-width: 265px; max-width: 265px; }</style>'))
-              fileInput('myfile', 'Choose a tab delimited file',
-                accept=c('text/comma-separated-values' , 'text/plain'))
+              fileInput('myfile'
+                ,'Choose a tab delimited file'
+                # , accept=c('text/comma-separated-values' , 'text/plain') 
+                , multiple=TRUE)
               ,actionButton("example" , "Load Example Dataset")
               ,helpText("Transform Phenotype accepts a tab-delimited file with header")
               ,tags$hr()
