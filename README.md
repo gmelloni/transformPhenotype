@@ -20,7 +20,7 @@ To run it locally, you can install the **shiny** package in R, and
 use the function `runGithub()`
 ```s
 if (!require('shiny')) install.packages("shiny")
-shiny::runGitHub("transformPhenotype", "gmelloni")
+shiny::runGitHub("transformPhenotype", "gmelloni" , ref="production")
 ```
 Original code by Angela Matchan, improved by Arthur Gilly, Loz Southam and Rachel Moore.
 Master branch is compatible with original script. Future versions will probably walk astray.
