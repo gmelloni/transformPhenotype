@@ -17,6 +17,7 @@ tagfordisable <- singleton(tags$head(HTML(
 '
 )))
 
+
 shinyUI(
   dashboardPage(skin="purple"
     ,header=dashboardHeader(title = "Transform Phenotype App" , titleWidth=350)
@@ -43,11 +44,12 @@ shinyUI(
       ,tabItems(
         tabItem("analysispan" , 
           fluidPage(
-            tagfordisable 
+            tagfordisable
             ,sidebarLayout(
               sidebarPanel(
               fileInput('myfile'
-                ,'Choose a tab delimited file' 
+                ,'Choose a tab delimited file'
+                # , accept=c('text/comma-separated-values' , 'text/plain') 
                 , multiple=TRUE)
               ,actionButton("example" , "Load Example Dataset")
               ,helpText("Transform Phenotype accepts a tab-delimited file with header")
@@ -102,11 +104,20 @@ shinyUI(
                 type = "tabs"
                 ,tabPanel("Uploaded Data" , fluidPage(DT::dataTableOutput("contents")
                                           , verbatimTextOutput("dferror")
-                                          )))
-                , tabPanel("Gender Difference" , fluidPage(uiOutput("sexplot")))
-                , tabPanel("Transform Plot" , uiOutput("transformer"))
-                , tabPanel("Normality Summary" , fluidPage(uiOutput("normalTable")))
-                , tabPanel("Covariate Analysis" , uiOutput("covariateAnalysis"))
+                                          ))
+                , tabPanel("Gender Difference" , fluidPage(
+                    uiOutput("sexplot")
+                    )
+                  )
+                , tabPanel("Transform Plot" 
+                    ,uiOutput("transformer")
+                  )
+                , tabPanel("Normality Summary" , fluidPage(
+                    uiOutput("normalTable")
+                    )
+                  )
+                , tabPanel("Covariate Analysis" , uiOutput("covariateAnalysis")
+                  )
                 , tabPanel("Protocol" , fluidPage(
                       p(h3(span("Current Trait" , style = "color:blue")))
                       ,tableOutput("protocolFile")
@@ -149,11 +160,23 @@ shinyUI(
 )
 
 
+#-----------------------------#
+#       CODE CEMETERY         #
+#-----------------------------#
+# FAILED AESTHESTICS IMPROVEMENTS
+# tags$head(HTML('<style>.span2 {min-width: 265px; max-width: 265px; }</style>'))
+         #    ,tags$head(
+          #   tags$style(type="text/css", "label.radio { display: inline-block; }", ".radio input[type=\"radio\"] { float: none; }"),
+          #   tags$style(type="text/css", "select { max-width: 200px; }"),
+          #   tags$style(type="text/css", "textarea { max-width: 4000px; }"),
+          #   tags$style(type="text/css", ".jslider { max-width: 200px; }"),
+          #   tags$style(type='text/css', ".well { padding: 12px; margin-bottom: 5px; max-width: 280px; }"),
+          #   tags$style(type='text/css', ".span4 { max-width: 10px; }"),
+          #   tags$style(type='text/css', ".span8 { max-width: 4000px; min-width: 4000px;}")
+            # )
+            # , conditionalDisabledPanel(element="goDDButton" , tagmessage="go_with_the_analysis")
 
-#---------------#
-# CODE CEMETERY #
-#---------------#
-
+# UNUSED DISABLING TAG
 # tagfordisable2 <- singleton(tags$head(HTML(
 # '
 #   <script type="text/javascript">
@@ -168,4 +191,3 @@ shinyUI(
 #   </script>
 # '
 # )))
-
