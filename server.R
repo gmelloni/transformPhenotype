@@ -45,7 +45,6 @@ rawData <- reactive({
   } else {
     return(NULL)
   }
-  print(str(inFile))
   if(nrow(inFile)==1){
     out <- read.table(inFile$datapath
               , header=TRUE
@@ -155,7 +154,10 @@ rawData <- reactive({
   numTraits <- sapply(out[ , colnames(out) %notin% c("age" , "sex")] , class) %in% c("numeric" , "integer") %>%
                 which %>%
                 length
-  numStrats <- (length(which(sapply(out , class)=="character")) - 1)
+  # numStrats <- (length(which(sapply(out , class)=="character")) - 1)
+  rule1 <- sapply(out , class) %in% c("character" , "integer")
+  rule2 <- sapply(out , function(x) any(duplicated(x)))
+  numStrats <- length(which(rule1 & rule2))
   dferror$myerror <- c(
     "DATA LOADED CORRECTLY:"
     ,"Numeric Traits (excluding sex and age):" %++% numTraits
@@ -229,7 +231,7 @@ observe({
   if(!is.null(rawData())){
     # covariates must be numerical or integer
     newchoices <- colnames(rawData())[sapply(rawData() , class)!="character"]
-    newchoices <- c(NA , newchoices)
+    # newchoices <- c(NA , newchoices)
     if("age" %in% newchoices)
       newchoices <- c(newchoices , "age2") %>% sort
     newchoices <- newchoices[ newchoices!=input$trait ]
@@ -243,12 +245,18 @@ observe({
 # Stratifiers are all the character columns, except for sample_id column
 observe({
   if(!is.null(rawData())){
-    # covariates must be character
-    stratifiers <- c(NA , colnames(rawData())[sapply(rawData() , class)=="character"])
-    stratifiers <- stratifiers[stratifiers!="sample_id"]
+    # Rules to be a stratifier:
+      # being a vector of type character or integer
+      # contain at least a duplicated value (otherwise the splitting makes no sense)
+      # sex cannot be a stratifier (it is treated separately)
+    rule1 <- sapply(rawData() , class) %in% c("character" , "integer")
+    rule2 <- sapply(rawData() , function(x) any(duplicated(x)))
+    newstrats <- colnames(rawData())[rule1 & rule2]
+    stratifiers <- newstrats
+    stratifiers <- stratifiers[stratifiers %notin% c("sample_id" , "sex")]
     updateSelectInput(session , "stratifier" , "Choose one stratification variable:"
         , choices=stratifiers
-        , selected=NA
+        , selected=NULL
     )
   }
 })
@@ -265,7 +273,7 @@ if(input$trait!=""){
   myfilter <- input$filters %>%
               paste(c("<" , ">") , . , sep="") %>%
               paste(. , collapse=",")
-  covariates <- if(any(input$covariates_tested %in% c("NA","") )) {
+  covariates <- if(is.null(input$covariates_tested)) {
                   NA
                 } else {
                   paste(input$covariates_tested , collapse=",")
@@ -314,7 +322,7 @@ traitObject <- reactive({
   if(length(missingSex>0)){
     dataset <- dataset[-missingSex,]
   }
-  if(is.na(input$stratifier)| input$stratifier %in% c("" , "NA")){
+  if(is.null(input$stratifier)){
     traitObject <- createDF(currTrait,covList,dataset)
     # Apply hard filter for oulier
     if(!is.na(altFilter)){
@@ -353,7 +361,7 @@ traitObject <- reactive({
     }
     return(traitObjforRawPlot)
   } else {
-    datasetsplit <- split(dataset , dataset[ , input$stratifier])
+    datasetsplit <- split(dataset , as.list(dataset[ , input$stratifier , drop=FALSE]))
     traitObjectSplit <- lapply(datasetsplit , function(dataset){
       traitObject <- createDF(currTrait,covList,dataset)
       # Apply hard filter for oulier
@@ -469,7 +477,7 @@ output$sexplot <- renderUI({
       plotOutput("sexplotempty" , height="800px")
     )
   }
-  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+  if(is.null(input$stratifier)){
     # Check if sex is among covariates
     # Run Wilcoxon test to see if sexes differ and print out density plot
     females<-which(traitObject()$sex==2)
@@ -482,12 +490,12 @@ output$sexplot <- renderUI({
     tabs <- lapply(names(traitObject()) , function(strat){
               females<-which(traitObject()[[strat]]$sex==2)
               males<-which(traitObject()[[strat]]$sex==1)
-              output[[paste0("sexstrat_",strat)]] <- renderPlot({
+              output[[paste0(which(strat==names(traitObject())) , "sexstrat_")]] <- renderPlot({
                     sexStratificationPlot(X=traitObject()[[strat]],m=males,f=females
                                       ,label=currTrait,labelFull=traitLabelFull
                                       ,project=project)
                   })
-              return(tabPanel(strat , plotOutput(paste0("sexstrat_",strat) , height="800px")))
+              return(tabPanel(strat , plotOutput(paste0(which(strat==names(traitObject())) , "sexstrat_") , height="800px")))
             })
     return(do.call(tabsetPanel , tabs))
   }
@@ -507,7 +515,7 @@ output$transformer <- renderUI({
   traitUnit <- protocolFile()$units
   traitLabelFull <- paste(currTrait," (",traitUnit,")",sep="")
   transformMethod <- protocolFile()$transformation_method
-  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+  if(is.null(input$stratifier)){
     # Initialize transformation side effect output
     outputList <- list(paste(transformMethod , "further Normalization Info:"))
     if(input$sexStratFlag=="Yes"){
@@ -598,7 +606,7 @@ output$transformer <- renderUI({
       # Store all the output of the transformation, I am sure is going to be useful
       # mytransform$transformer <- forPlotandTable
       # If radiobutton stratified by sex is on Yes, the plot is run twice for m and f
-      output[[paste0(strat , "_transformerplot")]] <- renderPlot({
+      output[[paste0(which(strat==names(traitObject())) , "_transformerplot")]] <- renderPlot({
         return({
           if(input$sexStratFlag=="Yes"){
             # loop <- c("Males" , "Females")
@@ -613,7 +621,7 @@ output$transformer <- renderUI({
           })
       })
       # Display all the residual output from transformation (see box cox example)
-      output[[paste0(strat , "_normalizationSideEffect")]] <- renderPrint({
+      output[[paste0(which(strat==names(traitObject())) , "_normalizationSideEffect")]] <- renderPrint({
         if(is.null(traitObject())){
           return(NULL)
         }
@@ -621,9 +629,9 @@ output$transformer <- renderUI({
       })
       return({
         tabPanel(strat , fluidPage(
-          plotOutput(paste0(strat , "_transformerplot"),height = "800px")
+          plotOutput(paste0(which(strat==names(traitObject())) , "_transformerplot"),height = "800px")
           ,tags$hr()
-          ,verbatimTextOutput(paste0(strat , "_normalizationSideEffect"))
+          ,verbatimTextOutput(paste0(which(strat==names(traitObject())) , "_normalizationSideEffect"))
         ))
       })
     })
@@ -647,7 +655,7 @@ output$normalTable <- renderUI({
     plotOutput("normalTableEmpty" , height="800px")
     )
   }
-  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+  if(is.null(input$stratifier)){
     if(input$sexStratFlag=="Yes"){
       Transformation <- names(normalizationFunctionsList)
       females<-which(traitObject()$sex==2)
@@ -686,7 +694,6 @@ output$normalTable <- renderUI({
             return(c(trans , ad , sw , ks))
           })
       normalTable <- do.call("rbind" , normalTable)
-      print(str(normalTable))
       colnames(normalTable) <- c("Transformation" 
                                 , "Anderson-Darling Test" 
                                 , "Shapiro-Wilks Test" 
@@ -746,13 +753,12 @@ output$normalTable <- renderUI({
               return(c(trans , ad , sw , ks))
             })
         normalTable <- do.call("rbind" , normalTable)
-        print(str(normalTable))
         colnames(normalTable) <- c("Transformation" 
                                   , "Anderson-Darling Test" 
                                   , "Shapiro-Wilks Test" 
                                   , "Kolmogorov-Smirnov Test")
       }
-      output[[paste0("normalTable_" , strat)]] <- DT::renderDataTable({
+      output[[paste0(which(strat==names(traitObject())) , "normalTable_")]] <- DT::renderDataTable({
                 DT::datatable(normalTable) %>% 
                 formatStyle("Anderson-Darling Test" 
                     , backgroundColor = styleInterval(0.05, c('lightgray', 'yellow'))) %>%
@@ -763,7 +769,7 @@ output$normalTable <- renderUI({
                 })
       return({
         tabPanel(strat 
-              , DT::dataTableOutput(paste0("normalTable_" , strat))
+              , DT::dataTableOutput(paste0(which(strat==names(traitObject())) , "normalTable_"))
               ,helpText("If you see a yellow box, p-value is over 0.05 and normality test is OK ;=)")
               ,helpText("Empty cells means that the test could not be evaluated"))
                 })
@@ -783,7 +789,7 @@ output$covariateAnalysis <- renderUI({
     )
   }
   covariates <- protocolFile()$covariates_tested
-  covariates <- if(is.na(covariates) | covariates=="") NA else covariates
+  covariates <- if(is.null(covariates)) NA else covariates
   if(is.na(covariates)){
     output$covariateAnalysisEmpty <- emptyPlotter("No covariates selected")
     return(
@@ -797,7 +803,7 @@ output$covariateAnalysis <- renderUI({
   cvr <- unlist(strsplit(covariates , ","))
   covList<- list(covariates=cvr
               , age2Flag=if("age2" %in% cvr) TRUE else NA)
-  if(is.na(input$stratifier) | input$stratifier %in% c("" , "NA")){
+  if(is.null(input$stratifier)){
     if(input$sexStratFlag=="Yes"){
       cvr <- unlist(strsplit(covariates , ",")) %>% .[.!="sex"]
       if(length(cvr)==0){
@@ -928,7 +934,7 @@ output$covariateAnalysis <- renderUI({
                     , outputData=outputData))
           })
             # First checkpoint, show the summary of the linear model
-        output[[paste0(strat , "_linearCovariates")]] <- renderPrint(
+        output[[paste0(which(strat==names(traitObject())) , "_linearCovariates")]] <- renderPrint(
           invisible(sapply(names(normDataListForPlot) , function(x) {
                         return(cat(toupper(x) , show(normDataListForPlot[[x]][["signifCovs"]][["summary"]]) , sep="\n"))
                       }))
@@ -936,9 +942,9 @@ output$covariateAnalysis <- renderUI({
         # Add a side effect for this function, by reporting the actual residual table
         outputData <- do.call("rbind" , lapply(normDataListForPlot , '[[' , "outputData") )
         observe({
-          residual[[paste0(strat , "_df_res")]] <- outputData
+          residual[[paste0(which(strat==names(traitObject())) , "_df_res")]] <- outputData
         })
-        output[[paste0(strat , "_residualsPlot")]] <- renderPlot(
+        output[[paste0(which(strat==names(traitObject())) , "_residualsPlot")]] <- renderPlot(
           plotResidual2(
                         tl=currTrait
                         ,tlf=traitLabelFull
@@ -946,7 +952,7 @@ output$covariateAnalysis <- renderUI({
                         ,sexStratFlag=input$sexStratFlag
                         )
         )
-        output[[paste0(strat , "_downloadResiduals")]] <- downloadHandler(
+        output[[paste0(which(strat==names(traitObject())) , "_downloadResiduals")]] <- downloadHandler(
           filename=function() {
             timeTag <- Sys.time() %>% 
                   sub(" GMT$" , "" , .) %>% 
@@ -956,7 +962,7 @@ output$covariateAnalysis <- renderUI({
             paste(protocolFile()$trait , "residuals" , strat , timeTag , "stand_residuals.txt" , sep=".")
           }
           , content=function(file) {
-              write.table(residual[[paste0(strat , "_df_res")]]
+              write.table(residual[[paste0(which(strat==names(traitObject())) , "_df_res")]]
                       , file=file
                       , sep = "\t"
                       , col.names = TRUE
@@ -965,9 +971,9 @@ output$covariateAnalysis <- renderUI({
         })
       return(tabPanel(
               strat
-              ,downloadButton(paste0(strat , "_downloadResiduals") , label="Download Final Residuals")
-              ,verbatimTextOutput(paste0(strat , "_linearCovariates"))
-              ,plotOutput(paste0(strat , "_residualsPlot"), height="800px") )
+              ,downloadButton(paste0(which(strat==names(traitObject())) , "_downloadResiduals") , label="Download Final Residuals")
+              ,verbatimTextOutput(paste0(which(strat==names(traitObject())) , "_linearCovariates"))
+              ,plotOutput(paste0(which(strat==names(traitObject())) , "_residualsPlot"), height="800px") )
       )
     })
     do.call(tabsetPanel , tabs)
@@ -1024,7 +1030,7 @@ session$onSessionEnded(function() {
 # NOTE: this version is a two step filter like the original code
 # In the original code SD filter is used after sex stratification. Now it is all in 1 step
 # Filtered Data Reactive Object
-  # This object take the result from traiObject and apply SD based filter
+  # This object take the result from traitObject and apply SD based filter
 # traitObject2 <- reactive({
 #   numSDs <- protocolFile()$sd_num
 #   sdDir <- protocolFile()$sd_dir

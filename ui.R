@@ -46,8 +46,9 @@ shinyUI(
           fluidPage(
             tagfordisable
             ,sidebarLayout(
-              sidebarPanel(
-              fileInput('myfile'
+              sidebarPanel(id="sideID"
+              ,style = "overflow-y:scroll; max-height: 1000px; position:relative;"
+              ,fileInput('myfile'
                 ,'Choose a tab delimited file'
                 # , accept=c('text/comma-separated-values' , 'text/plain') 
                 , multiple=TRUE)
@@ -83,10 +84,11 @@ shinyUI(
                 ,value = c(0,1))
               ,selectInput("covariates_tested", 
                 "Choose one or more covariate:", 
-                ,choices=NA
+                ,choices=NULL
                 ,multiple=TRUE
-                ,selected=NA)
-              ,helpText("If you select NA among covariates, it will overwrite any other choice")
+                # ,selected=NA
+                )
+              # ,helpText("If you select NA among covariates, it will overwrite any other choice")
               ,tags$hr()
               ,radioButtons('sexStratFlag', 'Stratify by sex?'
                    ,c("Yes"="Yes"
@@ -95,10 +97,11 @@ shinyUI(
                     ,"No")
               ,selectInput("stratifier"
                 ,"Choose one stratification column:"
-                ,choices=NA
-                ,multiple=FALSE
-                ,selected=NA)
-            )
+                ,choices=NULL
+                ,multiple=TRUE
+                # ,selected=NA
+                )
+            ,width=3)
             ,mainPanel(
               tabsetPanel(
                 type = "tabs"
@@ -128,7 +131,7 @@ shinyUI(
                       ,DT::dataTableOutput("cumulativeProtocolFile")
                       ))
               )
-            )
+            ,width=9)
           ))
         )
         #### HELP SECTION IN DEVELOPMENT ####
