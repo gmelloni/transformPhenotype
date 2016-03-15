@@ -434,7 +434,7 @@ output$cumulativeProtocolFile <- DT::renderDataTable({
   })
 observeEvent(input$deleteattempt , {
   if(!is.null(input$cumulativeProtocolFile_rows_selected)){
-    temp <- values$df_data[ -input$cumulativeProtocolFile_rows_selected , ]
+    temp <- values$df_data[ -as.numeric(input$cumulativeProtocolFile_rows_selected) , ]
     values$df_data <- temp
   }
 })
