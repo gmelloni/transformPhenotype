@@ -3,7 +3,7 @@ A shiny app to normalize continuous traits in GWAS
 
 The app relies on some external libraries that you can install beforehand.
 Simply run the following code:
-```s
+```{r}
 neededLibraries <- c(
 "shiny"
 ,"shinydashboard"
@@ -13,12 +13,12 @@ neededLibraries <- c(
 ,"nortest"
 ,"forecast"
 )
-sapply(neededLibraries , function(x) if(!x %in% installed.packages()) install.packages(x))
+sapply(neededLibraries , function(x) if(!x %in% installed.packages()[,1]) install.packages(x))
 ```
 
 To run it locally, you can install the **shiny** package in R, and
 use the function `runGithub()`
-```s
+```{r}
 if (!require('shiny')) install.packages("shiny")
 shiny::runGitHub("transformPhenotype", "gmelloni" , ref="production")
 ```
