@@ -27,7 +27,8 @@ normalizationPlot <- function(x , i , traitLabelFull){
         hist( x=x
             , main=paste(i , mymain , sep="\n")
             , xlab=traitLabelFull
-            , prob=TRUE)
+            , prob=TRUE
+            , breaks=40)
         m <- mean(x, na.rm=TRUE)
         std <- sd(x,na.rm=TRUE) 
         curve(dnorm(x,mean=m,sd=std)
