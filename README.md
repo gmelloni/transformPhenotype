@@ -12,6 +12,7 @@ neededLibraries <- c(
 ,"magrittr"
 ,"nortest"
 ,"forecast"
+,"fBasics"
 )
 sapply(neededLibraries , function(x) if(!x %in% installed.packages()[,1]) install.packages(x))
 ```
