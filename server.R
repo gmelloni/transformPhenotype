@@ -1,4 +1,5 @@
 
+library(fBasics)
 library(shiny)
 library(magrittr)
 library(nortest)
@@ -507,7 +508,7 @@ output$transformer <- renderUI({
   if(is.null(rawData())){
     output$transformerempty <- emptyPlotter("No Data Yet")
     return(
-    fludifPage(plotOutput("transformerempty" , height="800px"))
+    fluidPage(plotOutput("transformerempty" , height="800px"))
     )
   }
   # Protocol Variables
@@ -560,6 +561,38 @@ output$transformer <- renderUI({
         }
         })
     })
+    
+    # Try out basic statistics here (Vincent)
+    output$basicStatsTable <- renderDataTable(
+      {
+      return({
+        if(input$sexStratFlag=="Yes"){
+          print(loop)
+          tmpBS <- basicStats( x = forPlotandTable[['Males']])
+          malesBS <- tmpBS[c('Skewness','Kurtosis'),]
+          names(malesBS) <- c('Skewness','Kurtosis')
+          
+          tmpBS <- basicStats( x = forPlotandTable[['Females']])
+          femalesBS <- tmpBS[c('Skewness','Kurtosis'),]
+          names(femalesBS) <- c('Skewness','Kurtosis')
+          
+          sexStratBS <- data.frame(
+            Males_Skewness = malesBS['Skewness']
+            ,Males_Kurtosis = malesBS['Kurtosis']
+            ,Females_Skewness = femalesBS['Skewness']
+            ,Females_Kurtosis = femalesBS['Kurtosis']
+          )
+            
+        }else{
+          print(loop)
+          tmpBS <- basicStats( x = forPlotandTable[["No Stratification"]])
+          data.frame(Skewness=tmpBS['Skewness',],Kurtosis=tmpBS['Kurtosis',])
+        }
+      })
+    }
+    ,rownames=FALSE
+    )
+    
     # Display all the residual output from transformation (see box cox example)
     output$normalizationSideEffect <- renderPrint({
       if(is.null(traitObject())){
@@ -572,6 +605,7 @@ output$transformer <- renderUI({
         plotOutput("transformerplot",height = "800px")
         ,tags$hr()
         ,verbatimTextOutput("normalizationSideEffect")
+        ,dataTableOutput("basicStatsTable")
       )
     })
   } else {
@@ -620,6 +654,39 @@ output$transformer <- renderUI({
           }
           })
       })
+    print(loop)
+      # Added basic statistics here (Vincent)
+      output[[paste0(which(strat==names(traitObject())) ,"_basicStatsTable")]] <- renderDataTable(
+        {
+          return({
+            if(input$sexStratFlag=="Yes"){
+              print(loop)
+              tmpBS <- basicStats( x = forPlotandTable[['Males']])
+              malesBS <- tmpBS[c('Skewness','Kurtosis'),]
+              names(malesBS) <- c('Skewness','Kurtosis')
+              
+              tmpBS <- basicStats( x = forPlotandTable[['Females']])
+              femalesBS <- tmpBS[c('Skewness','Kurtosis'),]
+              names(femalesBS) <- c('Skewness','Kurtosis')
+              
+              sexStratBS <- data.frame(
+                Males_Skewness = malesBS['Skewness']
+                ,Males_Kurtosis = malesBS['Kurtosis']
+                ,Females_Skewness = femalesBS['Skewness']
+                ,Females_Kurtosis = femalesBS['Kurtosis']
+              )
+              
+            }else{
+              print(loop)
+              tmpBS <- basicStats( x = forPlotandTable[["No Stratification"]])
+              data.frame(Skewness=tmpBS['Skewness',],Kurtosis=tmpBS['Kurtosis',])
+            }
+          })
+        }
+        ,rownames=FALSE
+      )
+      
+      
       # Display all the residual output from transformation (see box cox example)
       output[[paste0(which(strat==names(traitObject())) , "_normalizationSideEffect")]] <- renderPrint({
         if(is.null(traitObject())){
@@ -632,6 +699,7 @@ output$transformer <- renderUI({
           plotOutput(paste0(which(strat==names(traitObject())) , "_transformerplot"),height = "800px")
           ,tags$hr()
           ,verbatimTextOutput(paste0(which(strat==names(traitObject())) , "_normalizationSideEffect"))
+          ,dataTableOutput(paste0(which(strat==names(traitObject())) ,"_basicStatsTable"))
         ))
       })
     })
