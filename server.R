@@ -284,6 +284,7 @@ if(input$trait!=""){
             ,transformation_method=input$transformation_method
             ,covariates_tested=covariates
             ,sd_num=if(input$sd_num=="NA") NA else as.numeric(input$sd_num)
+            ,sd_num_sex=if(input$sd_num_sex=="NA") NA else as.numeric(input$sd_num_sex)
             ,sd_dir=input$sd_dir
             ,filters=myfilter
             ,stringsAsFactors=FALSE
@@ -312,6 +313,7 @@ traitObject <- reactive({
   altFilter <- protocolFile()$filters
   currTrait <- protocolFile()$trait
   numSDs <- protocolFile()$sd_num
+  numSDs_sex <- protocolFile()$sd_num_sex
   sdDir <- protocolFile()$sd_dir
   covariates <- as.character(protocolFile()$covariates_tested)
   covariatesSplit <- unlist(strsplit(covariates , ","))
@@ -348,9 +350,22 @@ traitObject <- reactive({
         traitObjforRawPlot <- traitObject
       }
     } else {
-      if(!is.na(numSDs)){
-        sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
-        excl<-which(traitObject$ID %in% sdOutliers)
+      if(!is.na(numSDs_sex)){
+        #New from Vincent: SD in non-stratified data can now still be based on sex stratisfied distribution
+          maleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[males,])
+          femaleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[females,])
+          sdOutliers <- c(maleSdOutliers,femaleSdOutliers)
+          excl<-which(traitObject$ID %in% sdOutliers)
+          if(length(excl)>0){
+            traitObjforRawPlot <- traitObject[-excl,]
+          } else {
+            traitObjforRawPlot <- traitObject  
+          }
+        #Old method
+        }else if(!is.na(numSDs)){
+          sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
+          excl<-which(traitObject$ID %in% sdOutliers)
+        
         if(length(excl)>0){
           traitObjforRawPlot <- traitObject[-excl,]
         } else {
@@ -388,9 +403,21 @@ traitObject <- reactive({
           traitObjforRawPlot <- traitObject
         }
       } else {
-        if(!is.na(numSDs)){
-          sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
+        if(!is.na(numSDs_sex)){
+          #New from Vincent: SD in non-stratified data can now still be based on sex stratisfied distribution
+          maleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[males,])
+          femaleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[females,])
+          sdOutliers <- c(maleSdOutliers,femaleSdOutliers)
           excl<-which(traitObject$ID %in% sdOutliers)
+          if(length(excl)>0){
+            traitObjforRawPlot <- traitObject[-excl,]
+          } else {
+            traitObjforRawPlot <- traitObject  
+          }
+          #Old method
+          }else if(!is.na(numSDs)){
+            sdOutliers <- findSdOutliers(numSDs,sdDir,traitObject)
+            excl<-which(traitObject$ID %in% sdOutliers)
           if(length(excl)>0){
             traitObjforRawPlot <- traitObject[-excl,]
           } else {
