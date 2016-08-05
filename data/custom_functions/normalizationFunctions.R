@@ -28,7 +28,11 @@ normalizationFunctionsList <- list(
 	,"Log base 10" = function(x , ...) {
 		norm_data <- log10(x)
 		return(list(norm_data = norm_data))
-		}
+	}
+	,"1/x" = function(x , ...) {
+	  norm_data <- 1/x
+	  return(list(norm_data = norm_data))
+	}
 	,"Inverse Normal" = function(x , ...) {
 		norm_data <- qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))
 		return(list(norm_data=norm_data))
