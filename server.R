@@ -351,7 +351,7 @@ traitObject <- reactive({
       }
     } else {
       if(!is.na(numSDs_sex)){
-        #New from Vincent: SD in non-stratified data can now still be based on sex stratisfied distribution
+        #New from Vincent: SD in non-stratified data can now still be based on sex stratified distribution
           maleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[males,])
           femaleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[females,])
           sdOutliers <- c(maleSdOutliers,femaleSdOutliers)
@@ -404,7 +404,7 @@ traitObject <- reactive({
         }
       } else {
         if(!is.na(numSDs_sex)){
-          #New from Vincent: SD in non-stratified data can now still be based on sex stratisfied distribution
+          #New from Vincent: SD in non-stratified data can now still be based on sex stratified distribution
           maleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[males,])
           femaleSdOutliers <-findSdOutliers(numSDs_sex,sdDir,traitObject[females,])
           sdOutliers <- c(maleSdOutliers,femaleSdOutliers)

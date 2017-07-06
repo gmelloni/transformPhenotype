@@ -74,7 +74,7 @@ shinyUI(
                 ,multiple=FALSE
                 ,selected=NA)
               ,selectInput("sd_num_sex"
-                           ,"Filter Outliers based on SD value (Sex stratisfied):"
+                           ,"Filter Outliers based on SD value (Sex stratified):"
                            ,choices=c( 1 , 2 , 3 , 4 , 5 , 6 , NA )
                            ,multiple=FALSE
                            ,selected=NA)
@@ -158,7 +158,7 @@ shinyUI(
               p(h4("The TransformPhenotype App was created by Giorgio Melloni at the Wellcome Trust Sange Institute")),
               p(h4("The original code was written by Angela Matchan and improved by Arthur Gilly, Rachel Moore, Loz Southam and Vincent Appel")),
               p(h4("For any question or suggestion regarding the app, write to" 
-                  , span("giorgio.melloni [a] iit.it" , style = "color:blue"))),
+                  , span("melloni.giorgio [a] gmail.com" , style = "color:blue"))),
               br(),
               p(h3(strong("Thank you for using our app :)")))
             ))))
