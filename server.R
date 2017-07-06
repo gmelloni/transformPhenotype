@@ -510,10 +510,33 @@ output$sexplot <- renderUI({
     # Run Wilcoxon test to see if sexes differ and print out density plot
     females<-which(traitObject()$sex==2)
     males<-which(traitObject()$sex==1)
-    output$monosexplot <- renderPlot(sexStratificationPlot(X=traitObject(),m=males,f=females
+    output$monosexplot <- renderPlot({
+      sexStratificationPlot(X=traitObject(),m=males,f=females
                                     ,label=currTrait,labelFull=traitLabelFull
-                                    ,project=project))
-    return(plotOutput("monosexplot" , height="800px"))
+                                    ,project=project)
+    })
+    output$sexPlotDownload <- downloadHandler(
+      filename=function() {
+         timeTag <- Sys.time() %>% 
+             sub(" GMT$" , "" , .) %>% 
+             gsub(":" , "_" , .) %>%
+             gsub("-" , "" , .) %>%
+             sub(" " , "." , .)
+         paste(protocolFile()$trait , "sex" , timeTag , "pdf" , sep=".")
+       }
+       , content=function(file) {
+          pdf(file , width=16 , height=10)
+          sexStratificationPlot(X=traitObject(),m=males,f=females
+                           ,label=currTrait,labelFull=traitLabelFull
+                           ,project=project)
+          dev.off()
+       }
+    )
+    return(fluidPage(
+      plotOutput("monosexplot" , height="800px")
+      ,downloadButton("sexPlotDownload" , label = "Download Plot")
+      )
+    )
   } else {
     tabs <- lapply(names(traitObject()) , function(strat){
               females<-which(traitObject()[[strat]]$sex==2)
@@ -523,7 +546,28 @@ output$sexplot <- renderUI({
                                       ,label=currTrait,labelFull=traitLabelFull
                                       ,project=project)
                   })
-              return(tabPanel(strat , plotOutput(paste0(which(strat==names(traitObject())) , "sexstrat_") , height="800px")))
+              output[[paste0(which(strat==names(traitObject())) , "_sexPlotDownload")]] <- downloadHandler(
+               filename=function() {
+                  timeTag <- Sys.time() %>% 
+                      sub(" GMT$" , "" , .) %>% 
+                      gsub(":" , "_" , .) %>%
+                      gsub("-" , "" , .) %>%
+                      sub(" " , "." , .)
+                  paste(protocolFile()$trait , "sex" , input$stratifier , strat , timeTag , "pdf" , sep=".")
+                }
+                , content=function(file) {
+                   pdf(file , width=16 , height=10)
+                   sexStratificationPlot(X=traitObject()[[strat]],m=males,f=females
+                                      ,label=currTrait,labelFull=traitLabelFull
+                                      ,project=project)
+                   dev.off()
+                }
+              )
+              return(tabPanel(strat 
+                , plotOutput(paste0(which(strat==names(traitObject())) , "sexstrat_") , height="800px")
+                , downloadButton(paste0(which(strat==names(traitObject())) , "_sexPlotDownload") , label = "Download Plot")
+                )
+              )
             })
     return(do.call(tabsetPanel , tabs))
   }
@@ -588,6 +632,30 @@ output$transformer <- renderUI({
         }
         })
     })
+    # Add Download Handler for the plot
+    output$downloadPlotTransform <- downloadHandler(
+        filename=function() {
+          timeTag <- Sys.time() %>% 
+                sub(" GMT$" , "" , .) %>% 
+                gsub(":" , "_" , .) %>%
+                gsub("-" , "" , .) %>%
+                sub(" " , "." , .)
+          paste(protocolFile()$trait , "transform" , timeTag , "pdf" , sep=".")
+        }
+        , content=function(file) {
+            pdf(file , width=16 , height=10)
+             if(input$sexStratFlag=="Yes"){
+               # loop <- c("Males" , "Females")
+               par(mfrow=c(4,2))
+             } else {
+               # loop <- "No Stratification"
+               par(mfrow=c(2,2))
+             }
+             for(i in loop){
+               normalizationPlot( x = forPlotandTable[[i]] , i = i , traitLabelFull = traitLabelFull)
+             }
+            dev.off()           
+    }) 
     
     # Try out basic statistics here (Vincent)
     output$basicStatsTable <- renderDataTable(
@@ -626,10 +694,11 @@ output$transformer <- renderUI({
         return(NULL)
       }
       return(outputList)
-    })
+    })           
     return({
       fluidPage(
         plotOutput("transformerplot",height = "800px")
+        ,downloadButton("downloadPlotTransform" , label="Download Plot")
         ,tags$hr()
         ,verbatimTextOutput("normalizationSideEffect")
         ,dataTableOutput("basicStatsTable")
@@ -681,7 +750,30 @@ output$transformer <- renderUI({
           }
           })
       })
-    print(loop)
+      # Add Download Handler for the plot
+      output[[paste0(which(strat==names(traitObject())) , "_downloadPlotTransform")]] <- downloadHandler(
+        filename=function() {
+          timeTag <- Sys.time() %>% 
+                sub(" GMT$" , "" , .) %>% 
+                gsub(":" , "_" , .) %>%
+                gsub("-" , "" , .) %>%
+                sub(" " , "." , .)
+          paste(protocolFile()$trait , "transform" , input$stratifier , strat , timeTag , "pdf" , sep=".")
+        }
+        , content=function(file) {
+            pdf(file , width=16 , height=10)
+             if(input$sexStratFlag=="Yes"){
+               # loop <- c("Males" , "Females")
+               par(mfrow=c(4,2))
+             } else {
+               # loop <- "No Stratification"
+               par(mfrow=c(2,2))
+             }
+             for(i in loop){
+               normalizationPlot( x = forPlotandTable[[i]] , i = i , traitLabelFull = traitLabelFull)
+             }
+            dev.off()           
+      }) 
       # Added basic statistics here (Vincent)
       output[[paste0(which(strat==names(traitObject())) ,"_basicStatsTable")]] <- renderDataTable(
         {
@@ -724,6 +816,7 @@ output$transformer <- renderUI({
       return({
         tabPanel(strat , fluidPage(
           plotOutput(paste0(which(strat==names(traitObject())) , "_transformerplot"),height = "800px")
+          ,downloadButton(paste0(which(strat==names(traitObject())) , "_downloadPlotTransform") , label="Download Plot")
           ,tags$hr()
           ,verbatimTextOutput(paste0(which(strat==names(traitObject())) , "_normalizationSideEffect"))
           ,dataTableOutput(paste0(which(strat==names(traitObject())) ,"_basicStatsTable"))
@@ -961,6 +1054,25 @@ output$covariateAnalysis <- renderUI({
                       ,sexStratFlag=input$sexStratFlag
                       )
       )
+      output$downloadPlotResiduals <- downloadHandler(
+        filename=function() {
+          timeTag <- Sys.time() %>% 
+                sub(" GMT$" , "" , .) %>% 
+                gsub(":" , "_" , .) %>%
+                gsub("-" , "" , .) %>%
+                sub(" " , "." , .)
+          paste(protocolFile()$trait , "residuals" , timeTag , "pdf" , sep=".")
+        }
+        , content=function(file) {
+            pdf(file , width=16 , height=10)
+            plotResidual2(
+                      tl=currTrait
+                      ,tlf=traitLabelFull
+                      ,myList=normDataListForPlot
+                      ,sexStratFlag=input$sexStratFlag
+                      )
+            dev.off()
+      })
       output$downloadResidual <- downloadHandler(
         filename=function() {
           timeTag <- Sys.time() %>% 
@@ -981,7 +1093,9 @@ output$covariateAnalysis <- renderUI({
     return(fluidPage(
             downloadButton("downloadResidual" , label="Download Final Residuals")
             ,verbatimTextOutput("linearCovariates")
-            ,plotOutput("residualsPlot", height="800px") )
+            ,plotOutput("residualsPlot", height="800px") 
+            ,downloadButton("downloadPlotResiduals" , label="Download Plot")
+            )
     )
   } else {
     tabs <- lapply(names(traitObject()) , function(strat) {
@@ -1047,6 +1161,26 @@ output$covariateAnalysis <- renderUI({
                         ,sexStratFlag=input$sexStratFlag
                         )
         )
+        output[[paste0(which(strat==names(traitObject())) , "_residualsPlotDownload")]] <- downloadHandler(
+         filename=function() {
+           timeTag <- Sys.time() %>% 
+                sub(" GMT$" , "" , .) %>% 
+                gsub(":" , "_" , .) %>%
+                gsub("-" , "" , .) %>%
+                sub(" " , "." , .)
+          paste(protocolFile()$trait , "residuals" , input$stratifier , strat , timeTag , "pdf" , sep=".")
+          }
+          , content=function(file) {
+             pdf(file , width=16 , height=10)
+             plotResidual2(
+                        tl=currTrait
+                        ,tlf=traitLabelFull
+                        ,myList=normDataListForPlot
+                        ,sexStratFlag=input$sexStratFlag
+                        )
+             dev.off()
+          }
+        )
         output[[paste0(which(strat==names(traitObject())) , "_downloadResiduals")]] <- downloadHandler(
           filename=function() {
             timeTag <- Sys.time() %>% 
@@ -1068,7 +1202,9 @@ output$covariateAnalysis <- renderUI({
               strat
               ,downloadButton(paste0(which(strat==names(traitObject())) , "_downloadResiduals") , label="Download Final Residuals")
               ,verbatimTextOutput(paste0(which(strat==names(traitObject())) , "_linearCovariates"))
-              ,plotOutput(paste0(which(strat==names(traitObject())) , "_residualsPlot"), height="800px") )
+              ,plotOutput(paste0(which(strat==names(traitObject())) , "_residualsPlot"), height="800px")
+              ,downloadButton(paste0(which(strat==names(traitObject())) , "_residualsPlotDownload") , label="Download Plot")
+              )
       )
     })
     do.call(tabsetPanel , tabs)
